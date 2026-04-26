@@ -1,7 +1,7 @@
 # Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
 
 region              = "us-east-1"
-foundation_model_id = "anthropic.claude-sonnet-4-6-v1:0"
+foundation_model_id = "us.anthropic.claude-sonnet-4-6"
 
 # Langfuse credentials (cloud.langfuse.com). Stored in Secrets Manager at apply time.
 langfuse_host       = "https://cloud.langfuse.com"

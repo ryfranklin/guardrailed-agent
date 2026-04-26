@@ -5,9 +5,9 @@ variable "region" {
 }
 
 variable "foundation_model_id" {
-  description = "Bedrock foundation model ID. Default Claude Sonnet 4.6."
+  description = "Bedrock model or inference profile ID. Default: us.anthropic.claude-sonnet-4-6 (US cross-region profile, required for Sonnet 4.6 invocation)."
   type        = string
-  default     = "anthropic.claude-sonnet-4-6-v1:0"
+  default     = "us.anthropic.claude-sonnet-4-6"
 }
 
 variable "lf_admin_principal_arns" {

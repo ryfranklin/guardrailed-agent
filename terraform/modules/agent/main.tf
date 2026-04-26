@@ -18,8 +18,19 @@ locals {
   region     = data.aws_region.current.name
   partition  = data.aws_partition.current.partition
 
-  foundation_model_arn = "arn:${local.partition}:bedrock:${local.region}::foundation-model/${var.foundation_model_id}"
-  guardrail_arn        = "arn:${local.partition}:bedrock:${local.region}:${local.account_id}:guardrail/${var.guardrail_id}"
+  is_inference_profile     = can(regex("^(us|eu|apac|global)\\.", var.foundation_model_id))
+  underlying_model_id      = local.is_inference_profile ? regex("^(?:us|eu|apac|global)\\.(.+)$", var.foundation_model_id)[0] : var.foundation_model_id
+  inference_profile_arn    = "arn:${local.partition}:bedrock:${local.region}:${local.account_id}:inference-profile/${var.foundation_model_id}"
+  foundation_model_arn_any = "arn:${local.partition}:bedrock:*::foundation-model/${local.underlying_model_id}"
+
+  invokable_model_resources = local.is_inference_profile ? [
+    local.inference_profile_arn,
+    local.foundation_model_arn_any,
+    ] : [
+    "arn:${local.partition}:bedrock:${local.region}::foundation-model/${var.foundation_model_id}",
+  ]
+
+  guardrail_arn = "arn:${local.partition}:bedrock:${local.region}:${local.account_id}:guardrail/${var.guardrail_id}"
 }
 
 data "aws_iam_policy_document" "agent_trust" {
@@ -51,7 +62,7 @@ data "aws_iam_policy_document" "agent_policy" {
       "bedrock:InvokeModel",
       "bedrock:InvokeModelWithResponseStream",
     ]
-    resources = [local.foundation_model_arn]
+    resources = local.invokable_model_resources
   }
 
   statement {

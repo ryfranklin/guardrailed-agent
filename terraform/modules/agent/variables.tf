@@ -10,9 +10,16 @@ variable "name_prefix" {
 }
 
 variable "foundation_model_id" {
-  description = "Bedrock foundation model ID. Default Claude Sonnet 4.6 — overridable for Opus or future Sonnet versions."
+  description = <<-EOT
+    Bedrock model identifier passed to the agent. Accepts either a foundation model ID
+    (`anthropic.claude-sonnet-4-6`) or a cross-region inference profile ID
+    (`us.anthropic.claude-sonnet-4-6`). The module detects inference profiles by their
+    region prefix and grants InvokeModel on both the profile and the underlying foundation
+    model. Default is the US inference profile for Sonnet 4.6, which is required for
+    Anthropic models that only support INFERENCE_PROFILE invocation.
+  EOT
   type        = string
-  default     = "anthropic.claude-sonnet-4-6-v1:0"
+  default     = "us.anthropic.claude-sonnet-4-6"
 }
 
 variable "agent_instructions" {
