@@ -12,6 +12,14 @@ langfuse_secret_key = "sk-lf-CHANGE-ME"
 # lf_admin_principal_arns = ["arn:aws:iam::123456789012:role/SomeOperatorRole"]
 # trusted_assumer_arns    = ["arn:aws:iam::123456789012:role/GitHubActionsCI"]
 
+# Optional: SageMaker Unified Studio project execution roles that should see the
+# governed database inside Studio. Each gets Admin-equivalent LF grants on the
+# database (SELECT on all tables + DESCRIBE on the db). Leave empty for clients
+# that don't use SMUS.
+# smus_reader_role_arns = [
+#   "arn:aws:iam::123456789012:role/service-role/AmazonSageMakerAdminIAMExecutionRole",
+# ]
+
 # tags = {
 #   CostCenter = "ms3dm-flagship"
 # }

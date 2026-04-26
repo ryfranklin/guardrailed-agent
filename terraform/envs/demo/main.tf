@@ -154,3 +154,34 @@ resource "aws_iam_role_policy" "admin_invoke_agent" {
   role   = module.identity.admin_role_name
   policy = data.aws_iam_policy_document.persona_invoke_agent.json
 }
+
+resource "aws_lakeformation_permissions" "smus_reader_database_describe" {
+  for_each = toset(var.smus_reader_role_arns)
+
+  principal = each.value
+
+  database {
+    name = module.data_plane.glue_database_name
+  }
+
+  permissions                   = ["DESCRIBE"]
+  permissions_with_grant_option = []
+}
+
+resource "aws_lakeformation_permissions" "smus_reader_lf_tag_all" {
+  for_each = toset(var.smus_reader_role_arns)
+
+  principal = each.value
+
+  lf_tag_policy {
+    resource_type = "TABLE"
+
+    expression {
+      key    = module.data_plane.lf_tag_pii_key
+      values = module.data_plane.lf_tag_pii_values
+    }
+  }
+
+  permissions                   = ["SELECT", "DESCRIBE"]
+  permissions_with_grant_option = []
+}

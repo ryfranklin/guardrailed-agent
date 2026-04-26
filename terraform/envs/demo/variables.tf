@@ -40,6 +40,17 @@ variable "langfuse_secret_key" {
   sensitive   = true
 }
 
+variable "smus_reader_role_arns" {
+  description = <<-EOT
+    IAM role ARNs of SageMaker Unified Studio project execution roles that should see the governed database in SMUS.
+    Each gets the same Lake Formation grants as the Admin persona (SELECT on all tables, DESCRIBE on the database) so
+    the data team can browse and query the catalog from a Studio notebook. For per-client deployments, leave empty
+    if SMUS is not used in the target account.
+  EOT
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "Additional tags merged into the per-env default tags."
   type        = map(string)
