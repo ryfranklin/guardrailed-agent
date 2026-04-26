@@ -38,12 +38,7 @@ variable "athena_workgroup_name" {
 }
 
 variable "athena_results_bucket_arn" {
-  description = "Athena results bucket ARN — needed for Lambda to read query results back."
-  type        = string
-}
-
-variable "data_bucket_arn" {
-  description = "Raw data bucket ARN — needed for IAM least-privilege scoping."
+  description = "Athena results bucket ARN. Used as the storage target for the OpenAPI schema mirror."
   type        = string
 }
 

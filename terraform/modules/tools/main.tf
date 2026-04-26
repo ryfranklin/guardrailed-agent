@@ -18,12 +18,10 @@ data "aws_partition" "current" {}
 
 locals {
   function_name = "${var.name_prefix}query-ambassadors-${var.env}"
-  build_dir     = "${path.module}/.build/${var.env}"
   zip_path      = "${path.module}/.build/${var.env}.zip"
   account_id    = data.aws_caller_identity.current.account_id
   region        = data.aws_region.current.name
   partition     = data.aws_partition.current.partition
-  athena_wg_arn = "arn:${local.partition}:athena:${local.region}:${local.account_id}:workgroup/${var.athena_workgroup_name}"
 }
 
 data "archive_file" "lambda" {

@@ -105,7 +105,6 @@ module "tools" {
   lambda_source_dir         = "${path.module}/../../../lambdas/query_ambassadors"
   athena_workgroup_name     = module.data_plane.athena_workgroup_name
   athena_results_bucket_arn = module.data_plane.athena_results_bucket_arn
-  data_bucket_arn           = module.data_plane.data_bucket_arn
   glue_database_name        = module.data_plane.glue_database_name
   persona_role_arns         = module.identity.all_persona_role_arns
   langfuse_secret_arn       = module.observability.langfuse_secret_arn
