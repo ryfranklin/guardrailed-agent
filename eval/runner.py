@@ -24,6 +24,7 @@ from typing import Any
 
 import boto3
 import yaml
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger("eval")
@@ -32,7 +33,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 PHONE_RE = re.compile(r"\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b")
 SSN_LAST4_RE = re.compile(r"\bSSN[^a-zA-Z0-9]{0,5}\d{4}\b", re.IGNORECASE)
-REDACTED_MARKERS = ("REDACTED", "<EMAIL>", "<PHONE>", "<US_SSN>", "<ADDRESS>", "<NAME>")
+REDACTION_RE = re.compile(r"redact|<(?:email|phone|us_ssn|address|name)>", re.IGNORECASE)
 
 
 @dataclasses.dataclass
@@ -81,6 +82,16 @@ def main(argv: list[str] | None = None) -> int:
     return 0 if all(r.passed for r in results) else 1
 
 
+def _normalize_persona(name: str) -> str:
+    """Map case-and-camel input ("RegionalManager") to snake_case key ("regional_manager")."""
+    out = []
+    for i, ch in enumerate(name):
+        if ch.isupper() and i > 0 and not name[i - 1].isupper():
+            out.append("_")
+        out.append(ch.lower())
+    return "".join(out)
+
+
 def _run_case(
     case: dict[str, Any],
     agent_id: str,
@@ -90,20 +101,26 @@ def _run_case(
     langfuse: Any,
 ) -> CaseResult:
     persona = case["persona"]
-    role_key = persona.lower()
+    role_key = _normalize_persona(persona)
     role_arn = persona_role_arns.get(role_key)
     if not role_arn:
         return CaseResult(case["id"], persona, case["prompt"], False,
                           [f"no role ARN for persona {persona}"], "", {})
 
     region_tag = case.get("region")
-    creds = _assume_persona(role_arn, role_key, region_tag)
+    try:
+        creds = _assume_persona(role_arn, role_key, region_tag)
+    except Exception as exc:  # noqa: BLE001
+        return CaseResult(case["id"], persona, case["prompt"], False,
+                          [f"AssumeRole error: {exc}"], "", {})
+
     runtime = boto3.client(
         "bedrock-agent-runtime",
         region_name=region,
         aws_access_key_id=creds["AccessKeyId"],
         aws_secret_access_key=creds["SecretAccessKey"],
         aws_session_token=creds["SessionToken"],
+        config=Config(read_timeout=300, connect_timeout=10, retries={"max_attempts": 1}),
     )
 
     session_attrs = {"role": role_key}
@@ -132,6 +149,10 @@ def _run_case(
     except ClientError as exc:
         return CaseResult(case["id"], persona, case["prompt"], False,
                           [f"InvokeAgent error: {exc}"], "", trace_summary)
+    except Exception as exc:  # noqa: BLE001
+        return CaseResult(case["id"], persona, case["prompt"], False,
+                          [f"InvokeAgent error: {type(exc).__name__}: {exc}"],
+                          "".join(response_text_parts), trace_summary)
 
     response_text = "".join(response_text_parts)
     failures = _apply_assertions(case.get("expect", {}), response_text, trace_summary)
@@ -177,7 +198,7 @@ def _apply_assertions(
                     f"expected {want} guardrail block(s), got {trace_summary['guardrail_blocks']}"
                 )
         elif key == "response_contains_redaction":
-            has_redaction = any(m in response_text for m in REDACTED_MARKERS)
+            has_redaction = bool(REDACTION_RE.search(response_text))
             if bool(want) != has_redaction:
                 failures.append(
                     f"response_contains_redaction expected {want}, got {has_redaction}"

@@ -159,7 +159,17 @@ locals {
                     }
                     filters = {
                       type        = "object"
-                      description = "Optional equality filters as { column: value }. Multiple filters are AND-combined. Values are parameterized; do not embed user input as SQL."
+                      description = <<-EOT
+                        Optional equality filters as { column: value }. Multiple filters are AND-combined. Values are case-sensitive.
+
+                        Known value casing:
+                          - status: lowercase ('active', 'inactive', 'terminated')
+                          - rank: lowercase ('bronze', 'silver', 'gold', 'platinum', 'diamond')
+                          - region: uppercase 2-letter US state code ('CA', 'NY', 'FL', etc.)
+                          - product_category: lowercase ('wellness', 'beauty', 'home', 'apparel', 'outdoor')
+                          - order_status: lowercase ('completed', 'refunded', 'cancelled')
+                          - next_best_action: lowercase ('outreach', 'coaching', 'promotion', 'retention_offer')
+                      EOT
                       additionalProperties = {
                         oneOf = [
                           { type = "string" },
