@@ -172,21 +172,21 @@ data "aws_iam_policy_document" "data_access" {
 
 resource "aws_iam_role" "analyst" {
   name               = "${var.role_name_prefix}analyst-${var.env}"
-  description        = "Analyst persona — column-masked PII via Lake Formation LF-Tag policy."
+  description        = "Analyst persona - column-masked PII via Lake Formation LF-Tag policy."
   assume_role_policy = data.aws_iam_policy_document.persona_trust_analyst.json
   tags               = var.tags
 }
 
 resource "aws_iam_role" "regional_manager" {
   name               = "${var.role_name_prefix}regional-manager-${var.env}"
-  description        = "RegionalManager persona — full PII for assigned region only."
+  description        = "RegionalManager persona - full PII for assigned region only."
   assume_role_policy = data.aws_iam_policy_document.persona_trust_regional_manager.json
   tags               = var.tags
 }
 
 resource "aws_iam_role" "admin" {
   name               = "${var.role_name_prefix}admin-${var.env}"
-  description        = "Admin persona — unrestricted access."
+  description        = "Admin persona - unrestricted access."
   assume_role_policy = data.aws_iam_policy_document.persona_trust_admin.json
   tags               = var.tags
 }
