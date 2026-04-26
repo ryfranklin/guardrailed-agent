@@ -123,3 +123,34 @@ module "agent" {
   action_group_openapi_schema = module.tools.openapi_schema_inline
   tags                        = local.common_tags
 }
+
+data "aws_iam_policy_document" "persona_invoke_agent" {
+  statement {
+    sid    = "InvokeThisAgent"
+    effect = "Allow"
+    actions = [
+      "bedrock:InvokeAgent",
+    ]
+    resources = [
+      module.agent.agent_alias_arn,
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "analyst_invoke_agent" {
+  name   = "invoke-agent"
+  role   = module.identity.analyst_role_name
+  policy = data.aws_iam_policy_document.persona_invoke_agent.json
+}
+
+resource "aws_iam_role_policy" "regional_manager_invoke_agent" {
+  name   = "invoke-agent"
+  role   = module.identity.regional_manager_role_name
+  policy = data.aws_iam_policy_document.persona_invoke_agent.json
+}
+
+resource "aws_iam_role_policy" "admin_invoke_agent" {
+  name   = "invoke-agent"
+  role   = module.identity.admin_role_name
+  policy = data.aws_iam_policy_document.persona_invoke_agent.json
+}

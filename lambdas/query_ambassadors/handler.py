@@ -229,12 +229,15 @@ def _run_query(persona: PersonaContext, body: dict[str, Any]) -> list[dict[str, 
     sql, params = _build_query(persona, body)
     logger.info("athena query persona=%s table=%s sql=%s", persona.role, body["table"], sql)
 
-    execution_id = athena.start_query_execution(
-        QueryString=sql,
-        ExecutionParameters=params if params else None,
-        WorkGroup=ATHENA_WORKGROUP,
-        QueryExecutionContext={"Database": GLUE_DATABASE},
-    )["QueryExecutionId"]
+    start_kwargs: dict[str, Any] = {
+        "QueryString": sql,
+        "WorkGroup": ATHENA_WORKGROUP,
+        "QueryExecutionContext": {"Database": GLUE_DATABASE},
+    }
+    if params:
+        start_kwargs["ExecutionParameters"] = params
+
+    execution_id = athena.start_query_execution(**start_kwargs)["QueryExecutionId"]
 
     _wait_for_query(athena, execution_id)
     return _fetch_results(athena, execution_id)

@@ -40,12 +40,15 @@ resource "aws_bedrock_guardrail" "this" {
     }
   }
 
-  sensitive_information_policy_config {
-    dynamic "pii_entities_config" {
-      for_each = local.pii_entities
-      content {
-        action = var.pii_action
-        type   = pii_entities_config.value
+  dynamic "sensitive_information_policy_config" {
+    for_each = var.pii_action == "NONE" ? [] : [1]
+    content {
+      dynamic "pii_entities_config" {
+        for_each = local.pii_entities
+        content {
+          action = var.pii_action
+          type   = pii_entities_config.value
+        }
       }
     }
   }
@@ -78,7 +81,11 @@ resource "aws_bedrock_guardrail" "this" {
 
 resource "aws_bedrock_guardrail_version" "this" {
   guardrail_arn = aws_bedrock_guardrail.this.guardrail_arn
-  description   = "Initial version for ${var.env}."
+  description   = "Version for ${var.env} guardrail."
 
   depends_on = [aws_bedrock_guardrail.this]
+
+  lifecycle {
+    replace_triggered_by = [aws_bedrock_guardrail.this]
+  }
 }

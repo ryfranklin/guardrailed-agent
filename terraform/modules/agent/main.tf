@@ -18,13 +18,14 @@ locals {
   region     = data.aws_region.current.name
   partition  = data.aws_partition.current.partition
 
-  is_inference_profile     = can(regex("^(us|eu|apac|global)\\.", var.foundation_model_id))
-  underlying_model_id      = local.is_inference_profile ? regex("^(?:us|eu|apac|global)\\.(.+)$", var.foundation_model_id)[0] : var.foundation_model_id
-  inference_profile_arn    = "arn:${local.partition}:bedrock:${local.region}:${local.account_id}:inference-profile/${var.foundation_model_id}"
-  foundation_model_arn_any = "arn:${local.partition}:bedrock:*::foundation-model/${local.underlying_model_id}"
+  is_inference_profile                  = can(regex("^(us|eu|apac|global)\\.", var.foundation_model_id))
+  underlying_model_id                   = local.is_inference_profile ? regex("^(?:us|eu|apac|global)\\.(.+)$", var.foundation_model_id)[0] : var.foundation_model_id
+  inference_profile_arn_any             = "arn:${local.partition}:bedrock:*:${local.account_id}:inference-profile/${var.foundation_model_id}"
+  foundation_model_arn_any              = "arn:${local.partition}:bedrock:*::foundation-model/${local.underlying_model_id}"
+  application_inference_profile_arn_any = "arn:${local.partition}:bedrock:*:${local.account_id}:application-inference-profile/*"
 
   invokable_model_resources = local.is_inference_profile ? [
-    local.inference_profile_arn,
+    local.inference_profile_arn_any,
     local.foundation_model_arn_any,
     ] : [
     "arn:${local.partition}:bedrock:${local.region}::foundation-model/${var.foundation_model_id}",
@@ -134,6 +135,10 @@ resource "aws_bedrockagent_agent_alias" "live" {
   description      = "Published alias for ${local.agent_name}."
 
   depends_on = [aws_bedrockagent_agent_action_group.query_ambassadors]
+
+  lifecycle {
+    replace_triggered_by = [aws_bedrockagent_agent.this]
+  }
 
   tags = var.tags
 }

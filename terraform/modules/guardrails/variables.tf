@@ -10,12 +10,18 @@ variable "name_prefix" {
 }
 
 variable "pii_action" {
-  description = "Action applied to detected PII entities. ANONYMIZE keeps the conversation flowing while still satisfying the demo. BLOCK is reserved for client-specific severe cases."
+  description = <<-EOT
+    Action applied to detected PII entities.
+      - NONE    — skip Bedrock-side PII handling entirely. Lake Formation is the data-access gate; this avoids double-anonymization that would hide legitimate Admin access.
+      - ANONYMIZE — replace detected PII with placeholders in both directions. Belt-and-suspenders; can over-mask normal text (e.g. US state codes flagged as ADDRESS).
+      - BLOCK   — reject the entire response if any PII is detected. Reserved for client-specific severe cases.
+    Default NONE for the flagship demo because the demo moment requires Admin to see real PII; clients can opt up.
+  EOT
   type        = string
-  default     = "ANONYMIZE"
+  default     = "NONE"
   validation {
-    condition     = contains(["ANONYMIZE", "BLOCK"], var.pii_action)
-    error_message = "pii_action must be ANONYMIZE or BLOCK."
+    condition     = contains(["NONE", "ANONYMIZE", "BLOCK"], var.pii_action)
+    error_message = "pii_action must be NONE, ANONYMIZE, or BLOCK."
   }
 }
 
@@ -41,14 +47,6 @@ variable "denied_topics" {
       examples = [
         "What medication should I take for my migraine?",
         "Is this rash dangerous?",
-      ]
-    },
-    {
-      name       = "OutOfDomain"
-      definition = "Topics unrelated to ambassador performance, team health, orders, or signals. The agent only answers questions about the governed ambassador dataset."
-      examples = [
-        "Write me a poem about the ocean.",
-        "Who won the Super Bowl in 2024?",
       ]
     },
   ]

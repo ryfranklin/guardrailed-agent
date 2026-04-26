@@ -112,3 +112,4 @@ logs/
 
 # Claude Code per-user local settings
 .claude/settings.local.json
+terraform/modules/tools/.build/
