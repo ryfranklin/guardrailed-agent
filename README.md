@@ -114,4 +114,4 @@ Conventions:
 
 ## License
 
-TBD.
+Apache 2.0 — see [LICENSE](./LICENSE). Copyright 2026 Moonshot 3DM (ms3dm.tech).
