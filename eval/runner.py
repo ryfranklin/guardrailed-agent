@@ -50,7 +50,13 @@ class CaseResult:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
 
-    cfg = _load_terraform_outputs(args.tf_dir) if args.tf_dir else {}
+    cfg: dict[str, Any] = {}
+    if args.tf_dir and str(args.tf_dir).strip():
+        try:
+            cfg = _load_terraform_outputs(args.tf_dir)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("could not read terraform outputs from %s: %s; relying on flags",
+                           args.tf_dir, exc)
     agent_id = args.agent_id or cfg.get("agent_id")
     agent_alias_id = args.agent_alias_id or cfg.get("agent_alias_id")
     region = args.region

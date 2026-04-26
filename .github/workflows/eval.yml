@@ -32,11 +32,15 @@ jobs:
       - run: pip install -r lambdas/query_ambassadors/requirements.txt pytest==8.2.0
       - run: pytest lambdas/query_ambassadors/tests -v
 
+  # Live agent-eval against the deployed Demo. Opt-in only — runs on the weekly
+  # schedule and on manual workflow_dispatch. Not on every push because (a) it
+  # spends real Bedrock tokens, and (b) it needs agent IDs that aren't yet in
+  # remote terraform state.
   smoke:
     name: agent-eval
     runs-on: ubuntu-latest
     needs: unit
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -46,11 +50,22 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.7.5
-          terraform_wrapper: false
-      - run: terraform init -backend=false -input=false
-        working-directory: terraform/envs/demo
       - run: pip install -r eval/requirements.txt
-      - run: python eval/runner.py
+      - name: Resolve agent + account at runtime
+        id: ids
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          AGENT_ID=$(aws bedrock-agent list-agents --query "agentSummaries[?agentName=='gagent-demo'].agentId" --output text)
+          ALIAS_ID=$(aws bedrock-agent list-agent-aliases --agent-id "$AGENT_ID" --query "agentAliasSummaries[?agentAliasName=='live'].agentAliasId" --output text)
+          echo "account_id=$ACCOUNT_ID" >> "$GITHUB_OUTPUT"
+          echo "agent_id=$AGENT_ID" >> "$GITHUB_OUTPUT"
+          echo "alias_id=$ALIAS_ID" >> "$GITHUB_OUTPUT"
+      - name: Run eval
+        run: |
+          python eval/runner.py \
+            --agent-id "${{ steps.ids.outputs.agent_id }}" \
+            --agent-alias-id "${{ steps.ids.outputs.alias_id }}" \
+            --analyst-role-arn "arn:aws:iam::${{ steps.ids.outputs.account_id }}:role/gagent-analyst-demo" \
+            --regional-manager-role-arn "arn:aws:iam::${{ steps.ids.outputs.account_id }}:role/gagent-regional-manager-demo" \
+            --admin-role-arn "arn:aws:iam::${{ steps.ids.outputs.account_id }}:role/gagent-admin-demo" \
+            --tf-dir ""
