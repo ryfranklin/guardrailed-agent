@@ -1,0 +1,6 @@
+# Runtime deps for the query_ambassadors Lambda.
+# boto3 ships with the Lambda Python runtime, but we pin a known-good version
+# in case we ever bundle deps locally. Keep this minimal — no Bedrock-specific
+# glue beyond the action-group adapter in handler.py.
+boto3==1.34.162
+botocore==1.34.162

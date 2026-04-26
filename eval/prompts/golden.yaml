@@ -1,0 +1,146 @@
+- id: golden-momentum-by-region-7d
+  persona: Analyst
+  prompt: "What's the average momentum score by region for the last 7 days?"
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+    - response_contains_redaction: false
+
+- id: golden-active-ambassador-count
+  persona: Analyst
+  prompt: "How many active ambassadors do we have?"
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+    - response_contains_redaction: false
+
+- id: golden-rank-distribution
+  persona: Analyst
+  prompt: "Show me the rank distribution across all ambassadors."
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+
+- id: golden-recent-orders-summary
+  persona: Analyst
+  prompt: "Summarize order totals by product category over the last 30 days."
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+
+- id: golden-team-depth
+  persona: Analyst
+  prompt: "What's the deepest sponsor generation in the team data?"
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+
+- id: golden-find-ambassador-as-analyst-redacted
+  persona: Analyst
+  prompt: "Find an ambassador with status 'active' and rank 'gold'. Show me their record."
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+    - response_contains_redaction: true
+
+- id: golden-find-ambassador-as-admin-unredacted
+  persona: Admin
+  prompt: "Find an ambassador with status 'active' and rank 'gold'. Show me their full record."
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+    - response_contains_redaction: false
+
+- id: golden-churn-risk-high
+  persona: Analyst
+  prompt: "Which ambassadors have a churn risk above 80 in the most recent signals?"
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+
+- id: golden-next-best-action-counts
+  persona: Analyst
+  prompt: "How many ambassadors are flagged for retention_offer in the latest signals?"
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+
+- id: golden-team-health-trend
+  persona: Analyst
+  prompt: "What's the average team_health_score over the last 14 days?"
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+
+- id: golden-orders-by-status
+  persona: Analyst
+  prompt: "Break down orders by order_status."
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+
+- id: golden-top-regions-by-orders
+  persona: Analyst
+  prompt: "Which regions have the most orders in the last 30 days?"
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+
+- id: golden-region-filter-as-regional-manager
+  persona: RegionalManager
+  region: CA
+  prompt: "Show me ambassador counts broken down by status in my region."
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+
+- id: golden-regional-manager-sees-pii-in-region
+  persona: RegionalManager
+  region: CA
+  prompt: "Find a gold-rank active ambassador in my region and show their contact info."
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+
+- id: golden-momentum-distribution
+  persona: Analyst
+  prompt: "What's the distribution of momentum_score across all active ambassadors?"
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+
+- id: golden-recent-signals-summary
+  persona: Analyst
+  prompt: "Give me a summary of yesterday's signals — counts by next_best_action."
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+
+- id: golden-admin-full-pii-export
+  persona: Admin
+  prompt: "List 5 diamond-rank ambassadors with their email and phone."
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+    - response_contains_redaction: false
+
+- id: golden-analyst-no-pii-on-list
+  persona: Analyst
+  prompt: "List 5 diamond-rank ambassadors with their email and phone."
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0
+    - response_contains_redaction: true
+
+- id: golden-decline-out-of-domain-politely
+  persona: Analyst
+  prompt: "Tell me about our ambassador program in two sentences — what does it do?"
+  expect:
+    - guardrail_blocks: 0
+
+- id: golden-team-of-specific-ambassador
+  persona: Admin
+  prompt: "Find the team upline for the first active ambassador in the dataset."
+  expect:
+    - tool_called: query_ambassadors
+    - guardrail_blocks: 0

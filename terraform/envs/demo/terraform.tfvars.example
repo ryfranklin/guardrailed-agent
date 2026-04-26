@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+
+region              = "us-east-1"
+foundation_model_id = "anthropic.claude-sonnet-4-6-v1:0"
+
+# Langfuse credentials (cloud.langfuse.com). Stored in Secrets Manager at apply time.
+langfuse_host       = "https://cloud.langfuse.com"
+langfuse_public_key = "pk-lf-CHANGE-ME"
+langfuse_secret_key = "sk-lf-CHANGE-ME"
+
+# Optional: extra IAM principals beyond the deploying caller identity.
+# lf_admin_principal_arns = ["arn:aws:iam::123456789012:role/SomeOperatorRole"]
+# trusted_assumer_arns    = ["arn:aws:iam::123456789012:role/GitHubActionsCI"]
+
+# tags = {
+#   CostCenter = "ms3dm-flagship"
+# }

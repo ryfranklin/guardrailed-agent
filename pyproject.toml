@@ -1,0 +1,15 @@
+[project]
+name = "guardrailed-agent"
+version = "0.0.0"
+description = "ms3dm.tech Guardrailed Agent — Bedrock-native reference architecture"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["lambdas", "data", "eval"]

@@ -1,0 +1,56 @@
+name: eval
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 12 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - "eval/**"
+      - "lambdas/**"
+      - "terraform/**"
+      - ".github/workflows/eval.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  unit:
+    name: lambda-unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install -r lambdas/query_ambassadors/requirements.txt pytest==8.2.0
+      - run: pytest lambdas/query_ambassadors/tests -v
+
+  smoke:
+    name: agent-eval
+    runs-on: ubuntu-latest
+    needs: unit
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+          terraform_wrapper: false
+      - run: terraform init -backend=false -input=false
+        working-directory: terraform/envs/demo
+      - run: pip install -r eval/requirements.txt
+      - run: python eval/runner.py
