@@ -292,7 +292,7 @@ def _register_iceberg_tables(
     athena = boto3.client("athena", region_name=region)
 
     for table in tables:
-        stage_name = f"_stage_{table}"
+        stage_name = f"stg_{table}"
         stage_location = f"s3://{bucket}/staging/{table}/"
         iceberg_location = f"s3://{bucket}/{database}/{table}/"
 
@@ -325,7 +325,7 @@ def _iceberg_ctas_ddl(table: str, stage_name: str, location: str) -> str:
         partition_clause = f", partitioning = ARRAY[{cols}]"
     return (
         f"CREATE TABLE {table} "
-        f"WITH (table_type='ICEBERG', format='PARQUET', "
+        f"WITH (table_type='ICEBERG', is_external=false, format='PARQUET', "
         f"location='{location}'{partition_clause}) "
         f"AS SELECT * FROM {stage_name}"
     )

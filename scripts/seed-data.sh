@@ -16,8 +16,28 @@ echo "Seeding $DATABASE in $BUCKET (workgroup=$WORKGROUP, region=$REGION)"
 
 cd "$SYNTH_DIR"
 
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [[ -z "$PYTHON_BIN" ]]; then
+  for candidate in python3.12 python3.13 python3; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      ver=$("$candidate" -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")' 2>/dev/null || echo "0.0")
+      major=${ver%.*}
+      minor=${ver#*.}
+      if [[ "$major" -ge 3 && "$minor" -ge 12 ]]; then
+        PYTHON_BIN=$(command -v "$candidate")
+        break
+      fi
+    fi
+  done
+fi
+if [[ -z "$PYTHON_BIN" ]]; then
+  echo "error: need python3.12 or newer. Set PYTHON_BIN to override." >&2
+  exit 1
+fi
+echo "Using $PYTHON_BIN ($("$PYTHON_BIN" --version))"
+
 if [[ ! -d ".venv" ]]; then
-  python3 -m venv .venv
+  "$PYTHON_BIN" -m venv .venv
   ./.venv/bin/pip install -q --upgrade pip
   ./.venv/bin/pip install -q -r requirements.txt
 fi
