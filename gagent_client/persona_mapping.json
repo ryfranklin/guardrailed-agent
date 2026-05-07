@@ -1,0 +1,27 @@
+{
+  "_comment": "Persona mapping for ADR-009 Shape B (SSO via IAM Identity Center). Each rule's `match` is ANDed; the first matching rule wins. If no rule matches and `default_persona` is set, the default applies. Override the file path via GAGENT_PERSONA_MAPPING_FILE.",
+
+  "version": 1,
+
+  "default_persona": null,
+  "default_service_region": null,
+
+  "rules": [
+    {
+      "_comment": "Read-only / front-desk scope",
+      "match": {"permission_set": "GuardrailedAgentDispatcher"},
+      "persona": "dispatcher"
+    },
+    {
+      "_comment": "Field lead scope; service_region is the LF row-filter session tag",
+      "match": {"permission_set": "GuardrailedAgentTechnicianLead"},
+      "persona": "technician_lead",
+      "service_region": "tempe-mesa"
+    },
+    {
+      "_comment": "Unrestricted scope — typically only data-platform admins",
+      "match": {"permission_set": "GuardrailedAgentOwner"},
+      "persona": "owner"
+    }
+  ]
+}
