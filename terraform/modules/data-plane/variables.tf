@@ -4,7 +4,7 @@ variable "env" {
 }
 
 variable "glue_database_name" {
-  description = "Glue catalog database name. Iceberg tables for the four entities land here."
+  description = "Glue catalog database name. Iceberg tables for the governed entities land here."
   type        = string
 }
 
@@ -19,18 +19,18 @@ variable "lf_admin_principal_arns" {
   type        = list(string)
 }
 
-variable "analyst_role_arn" {
-  description = "IAM role ARN for the Analyst persona. Receives SELECT on non-PII columns via LF-Tag expressions."
+variable "dispatcher_role_arn" {
+  description = "IAM role ARN for the Dispatcher persona. Receives SELECT on pii=false AND sensitivity=other (ADR-008)."
   type        = string
 }
 
-variable "regional_manager_role_arn" {
-  description = "IAM role ARN for the RegionalManager persona. Receives SELECT on full PII, row-filtered by session tag region."
+variable "technician_lead_role_arn" {
+  description = "IAM role ARN for the TechnicianLead persona. Receives SELECT on full PII row-filtered by service_region session tag, but no sensitivity=high columns (ADR-008)."
   type        = string
 }
 
-variable "admin_role_arn" {
-  description = "IAM role ARN for the Admin persona. Receives unrestricted SELECT."
+variable "owner_role_arn" {
+  description = "IAM role ARN for the Owner persona. Receives unrestricted SELECT including sensitivity=high columns (ADR-008)."
   type        = string
 }
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# The demo moment: same prompt under Analyst vs Admin. Pass criteria in
-# docs/repo-bootstrap-brief.md §14.
+# The demo moment: same prompt under Dispatcher vs Owner (ADR-008 personas).
+# Sister script scripts/smoke-test-sensitivity.sh covers the sensitivity
+# tag gate (parts_inventory.unit_cost_usd is Owner-only).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -31,20 +32,20 @@ if [[ ! -d "$EVAL_DIR/.venv" ]]; then
 fi
 VENV_PY="$EVAL_DIR/.venv/bin/python"
 
-PROMPT="${1:-Find a gold-rank active ambassador and show me their full record including contact info.}"
+PROMPT="${1:-Show me one customer record in service_region 'tempe-mesa' including their full contact info: first name, last name, email, phone, and street address.}"
 
-ANALYST_ROLE_ARN=$(terraform -chdir="$ENV_DIR" output -raw analyst_role_arn)
-ADMIN_ROLE_ARN=$(terraform -chdir="$ENV_DIR" output -raw admin_role_arn)
+DISPATCHER_ROLE_ARN=$(terraform -chdir="$ENV_DIR" output -raw dispatcher_role_arn)
+OWNER_ROLE_ARN=$(terraform -chdir="$ENV_DIR" output -raw owner_role_arn)
 
-echo "=== As Analyst (PII should be redacted) ==="
+echo "=== As Dispatcher (PII should be redacted) ==="
 "$VENV_PY" "$REPO_ROOT/scripts/invoke-agent.py" \
-  --assume-role "$ANALYST_ROLE_ARN" \
-  --tags "role=analyst" \
+  --assume-role "$DISPATCHER_ROLE_ARN" \
+  --tags "role=dispatcher" \
   --prompt "$PROMPT"
 
 echo
-echo "=== As Admin (full PII) ==="
+echo "=== As Owner (full PII) ==="
 "$VENV_PY" "$REPO_ROOT/scripts/invoke-agent.py" \
-  --assume-role "$ADMIN_ROLE_ARN" \
-  --tags "role=admin" \
+  --assume-role "$OWNER_ROLE_ARN" \
+  --tags "role=owner" \
   --prompt "$PROMPT"

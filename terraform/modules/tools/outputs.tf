@@ -1,11 +1,11 @@
 output "lambda_function_name" {
-  description = "Name of the query_ambassadors Lambda."
-  value       = aws_lambda_function.query_ambassadors.function_name
+  description = "Name of the governed_query Lambda."
+  value       = aws_lambda_function.governed_query.function_name
 }
 
 output "lambda_arn" {
-  description = "ARN of the query_ambassadors Lambda."
-  value       = aws_lambda_function.query_ambassadors.arn
+  description = "ARN of the governed_query Lambda."
+  value       = aws_lambda_function.governed_query.arn
 }
 
 output "lambda_role_arn" {

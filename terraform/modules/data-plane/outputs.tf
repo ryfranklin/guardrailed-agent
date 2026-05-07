@@ -37,3 +37,13 @@ output "lf_tag_pii_values" {
   description = "Allowed values for the pii LF-Tag."
   value       = aws_lakeformation_lf_tag.pii.values
 }
+
+output "lf_tag_sensitivity_key" {
+  description = "Lake Formation tag key used to classify high-sensitivity (compensation/cost) columns (ADR-008)."
+  value       = aws_lakeformation_lf_tag.sensitivity.key
+}
+
+output "lf_tag_sensitivity_values" {
+  description = "Allowed values for the sensitivity LF-Tag."
+  value       = aws_lakeformation_lf_tag.sensitivity.values
+}

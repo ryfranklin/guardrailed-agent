@@ -12,7 +12,7 @@ One-page summary of the decisions that shape this repo. The full rationale lives
 | Tools | AWS Lambda action groups (OpenAPI 3 schemas) | [ADR-001](../ms3dm.tech/consulting/guardrailed-agent/decisions/001-bedrock-agents-and-guardrails.md) |
 | Data plane | S3 + Apache Iceberg + AWS Glue Catalog + AWS Lake Formation; cataloged in SMUS | [ADR-003](../ms3dm.tech/consulting/guardrailed-agent/decisions/003-data-plane-and-identity.md) |
 | Identity propagation | ABAC via session tags (`aws:PrincipalTag/role`, `aws:PrincipalTag/client`); LF policies key off these | [ADR-003](../ms3dm.tech/consulting/guardrailed-agent/decisions/003-data-plane-and-identity.md) |
-| Observability | Bedrock-native traces + Langfuse (cloud-hosted v1; self-hosted later if needed) | [ADR-004](../ms3dm.tech/consulting/guardrailed-agent/decisions/004-observability.md) |
+| Observability | Bedrock-native X-Ray traces + AgentCore Observability via CloudWatch Logs | [ADR-004](../ms3dm.tech/consulting/guardrailed-agent/decisions/004-observability.md) |
 | Front-end | Out of scope for v1; agent is **headless**. CLI invocation script for smoke test only. | — |
 | IaC | Terraform (HCL); module-per-concern | brief §6 |
 | Deployment topology | One AWS account per environment/client, inside the ms3dm.tech AWS Org (Control Tower–managed) | [ADR-002](../ms3dm.tech/consulting/guardrailed-agent/decisions/002-deployment-topology.md) |

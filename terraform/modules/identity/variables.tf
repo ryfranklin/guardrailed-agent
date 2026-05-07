@@ -4,7 +4,7 @@ variable "env" {
 }
 
 variable "role_name_prefix" {
-  description = "Prefix for IAM role names. Default 'gagent-' produces gagent-analyst-<env>, etc."
+  description = "Prefix for IAM role names. Default 'gagent-' produces gagent-dispatcher-<env>, gagent-technician-lead-<env>, gagent-owner-<env>."
   type        = string
   default     = "gagent-"
 }

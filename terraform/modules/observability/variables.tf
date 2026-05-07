@@ -1,36 +1,18 @@
 variable "env" {
-  description = "Environment name (e.g., demo). Used in secret naming."
+  description = "Environment name (e.g., demo). Used in log-group naming."
   type        = string
 }
 
-variable "name_prefix" {
-  description = "Prefix for the Secrets Manager secret name."
+variable "log_group_name" {
+  description = "CloudWatch log group for the gagent invocation telemetry stream. Surfaced by AgentCore Observability alongside the agent's auto-emitted X-Ray traces."
   type        = string
-  default     = "gagent/"
+  default     = "/gagent/invocations"
 }
 
-variable "langfuse_host" {
-  description = "Langfuse host URL. Default cloud.langfuse.com per §16."
-  type        = string
-  default     = "https://cloud.langfuse.com"
-}
-
-variable "langfuse_public_key" {
-  description = "Langfuse public key. Stored in Secrets Manager."
-  type        = string
-  sensitive   = true
-}
-
-variable "langfuse_secret_key" {
-  description = "Langfuse secret key. Stored in Secrets Manager."
-  type        = string
-  sensitive   = true
-}
-
-variable "recovery_window_in_days" {
-  description = "Recovery window for the secret. 0 deletes immediately on destroy — useful for dev/demo, never for production clients."
+variable "log_retention_days" {
+  description = "CloudWatch log retention in days. Defaults to 30 — a balance between audit window and storage cost."
   type        = number
-  default     = 7
+  default     = 30
 }
 
 variable "tags" {

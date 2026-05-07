@@ -95,7 +95,7 @@ resource "aws_iam_role_policy" "agent" {
 
 resource "aws_bedrockagent_agent" "this" {
   agent_name                  = local.agent_name
-  description                 = "Guardrailed analyst assistant for the ${var.env} ambassador dataset."
+  description                 = "Guardrailed agent for the ${var.env} HVAC home-services dataset (ADR-008)."
   agent_resource_role_arn     = aws_iam_role.agent.arn
   foundation_model            = var.foundation_model_id
   instruction                 = var.agent_instructions
@@ -111,11 +111,11 @@ resource "aws_bedrockagent_agent" "this" {
   tags = var.tags
 }
 
-resource "aws_bedrockagent_agent_action_group" "query_ambassadors" {
+resource "aws_bedrockagent_agent_action_group" "governed_query" {
   agent_id                   = aws_bedrockagent_agent.this.agent_id
   agent_version              = "DRAFT"
-  action_group_name          = "query_ambassadors"
-  description                = "Query the governed ambassador dataset. Lake Formation enforces per-persona row and column visibility."
+  action_group_name          = "governed_query"
+  description                = "Query the governed HVAC home-services dataset. Lake Formation enforces per-persona row and column visibility."
   action_group_state         = "ENABLED"
   skip_resource_in_use_check = true
 
@@ -133,7 +133,7 @@ resource "aws_bedrockagent_agent_alias" "live" {
   agent_alias_name = var.agent_alias_name
   description      = "Published alias for ${local.agent_name}."
 
-  depends_on = [aws_bedrockagent_agent_action_group.query_ambassadors]
+  depends_on = [aws_bedrockagent_agent_action_group.governed_query]
 
   lifecycle {
     replace_triggered_by = [aws_bedrockagent_agent.this]

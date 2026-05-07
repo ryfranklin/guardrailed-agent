@@ -10,7 +10,7 @@ variable "name_prefix" {
 }
 
 variable "lambda_source_dir" {
-  description = "Absolute path to the Lambda source directory. Defaults to ../../lambdas/query_ambassadors relative to envs/<env>."
+  description = "Absolute path to the Lambda source directory. Defaults to ../../lambdas/governed_query relative to envs/<env>."
   type        = string
 }
 
@@ -48,12 +48,17 @@ variable "glue_database_name" {
 }
 
 variable "persona_role_arns" {
-  description = "ARNs of the persona roles the Lambda may assume (Analyst, RegionalManager, Admin)."
+  description = "ARNs of the persona roles the Lambda may assume (Dispatcher, TechnicianLead, Owner)."
   type        = list(string)
 }
 
-variable "langfuse_secret_arn" {
-  description = "Secrets Manager ARN holding the Langfuse public/secret keys. Lambda reads this at runtime."
+variable "invocation_log_group" {
+  description = "CloudWatch log group the Lambda emits structured invocation telemetry to (gagent_client.emit_invocation_log)."
+  type        = string
+}
+
+variable "invocation_log_group_arn" {
+  description = "ARN of the invocation log group. Used to scope the log-write IAM grant."
   type        = string
 }
 

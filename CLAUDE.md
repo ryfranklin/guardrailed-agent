@@ -35,6 +35,6 @@ This repo is the implementation of the ms3dm.tech *Guardrailed Agent over Govern
 ## Don't do
 - Don't add new top-level dependencies without an ADR
 - Don't change the LF policy structure without an ADR
-- Don't introduce a non-AWS managed service for any v1 component (Langfuse is the only exception, scoped to dev/eval)
+- Don't introduce a non-AWS managed service for any v1 component
 - Don't hardcode account IDs, ARNs, or region-specific resources inside `terraform/modules/`
 - Don't mock Lake Formation or Bedrock in tests; integration tests must run against real AWS in the Demo account

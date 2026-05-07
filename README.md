@@ -12,7 +12,7 @@ The architecture demonstrably enforces data governance (Lake Formation row/colum
 
 What is **not** yet built:
 - Terraform modules (`terraform/modules/*`) — stubs only
-- Lambda action group (`lambdas/query_ambassadors/`) — stub only
+- Lambda action group (`lambdas/governed_query/`) — stub only
 - Synthetic data generator (`data/synthesizer/`) — stub only
 - Eval harness (`eval/`) — stub only
 - Operator scripts (`scripts/`) — stubs only
@@ -33,7 +33,7 @@ Stack at a glance:
 | Tools | AWS Lambda action groups |
 | Data plane | S3 + Apache Iceberg + AWS Glue + AWS Lake Formation |
 | Identity | ABAC via session tags |
-| Observability | Bedrock-native traces + Langfuse cloud |
+| Observability | Bedrock-native traces + CloudWatch GenAI Observability (AgentCore native) |
 | IaC | Terraform (HCL), module-per-concern |
 | Topology | One AWS account per environment/client |
 
@@ -42,7 +42,7 @@ Stack at a glance:
 ```
 terraform/      Terraform modules and per-environment compositions
 lambdas/        Lambda action group implementations (Python 3.12)
-data/           Synthetic ambassador data generator (Faker + Parquet)
+data/           Synthetic HVAC home-services data generator (Faker + Parquet)
 eval/           Prompt corpora and runner for golden + red-team cases
 scripts/        Operator entry points (deploy, seed, smoke test, invoke)
 docs/           Brief, getting-started, demo script, runbook
@@ -56,10 +56,10 @@ For Phase 1 work:
 - **Terraform** `>= 1.7` (AWS provider `~> 5.0`)
 - **Python** `3.12`
 - **AWS CLI** v2 with credentials for the target account (Demo or client)
-- **Langfuse** account (cloud, `cloud.langfuse.com`) and a public/secret key pair; the secret is stored in AWS Secrets Manager at deploy time
+- **CloudWatch Logs** access in the target account; invocation telemetry is written to a log group (default `/gagent/invocations`) and surfaced under "GenAI Observability" via AgentCore.
 - **Region:** `us-east-1` is the default
 
-No additional runtime dependencies — every component is AWS-managed except Langfuse.
+No additional runtime dependencies — every component is AWS-managed.
 
 ## Running the scripts (once Phase 1 ships)
 
@@ -70,14 +70,14 @@ These scripts will exist after Phase 1. They are stubs today.
 | `scripts/deploy-demo.sh` | `terraform apply` against `terraform/envs/demo/` for the ms3dm.tech Demo account |
 | `scripts/seed-data.sh` | Run the synthetic data generator and register the four Iceberg tables in Glue |
 | `scripts/smoke-test.sh` | The demo moment — same prompt under Analyst vs Admin, asserting redacted vs full PII |
-| `scripts/invoke-agent.py` | Headless CLI to invoke the Bedrock Agent under an assumed role with session tags |
+| `gra ask` | Headless CLI to invoke the Bedrock Agent under an assumed persona role with session tags (installed by `pip install -e .`) |
 
 Typical first-time deploy will look like:
 
 ```bash
 cd terraform/envs/demo
 cp terraform.tfvars.example terraform.tfvars
-# fill in langfuse_public_key, langfuse_secret_key_arn, etc.
+# tweak settings as needed (defaults are usually fine)
 terraform init
 terraform plan
 terraform apply

@@ -139,20 +139,26 @@ data "aws_iam_policy_document" "ci_permissions" {
       "sts:TagSession",
     ]
     resources = [
-      "arn:${local.partition}:iam::${local.account_id}:role/gagent-analyst-*",
-      "arn:${local.partition}:iam::${local.account_id}:role/gagent-regional-manager-*",
-      "arn:${local.partition}:iam::${local.account_id}:role/gagent-admin-*",
+      "arn:${local.partition}:iam::${local.account_id}:role/gagent-dispatcher-*",
+      "arn:${local.partition}:iam::${local.account_id}:role/gagent-technician-lead-*",
+      "arn:${local.partition}:iam::${local.account_id}:role/gagent-owner-*",
     ]
   }
 
   statement {
-    sid    = "EvalReadLangfuseSecret"
+    sid    = "EvalReadInvocationLogs"
     effect = "Allow"
     actions = [
-      "secretsmanager:GetSecretValue",
+      "logs:StartQuery",
+      "logs:StopQuery",
+      "logs:GetQueryResults",
+      "logs:DescribeQueries",
+      "logs:GetLogEvents",
+      "logs:FilterLogEvents",
+      "logs:DescribeLogStreams",
     ]
     resources = [
-      "arn:${local.partition}:secretsmanager:*:${local.account_id}:secret:gagent/*",
+      "arn:${local.partition}:logs:*:${local.account_id}:log-group:/gagent/invocations:*",
     ]
   }
 }

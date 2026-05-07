@@ -3,8 +3,14 @@
 Loads prompt corpora (golden + red_team), assumes the per-case persona role
 with session tags, invokes the Bedrock Agent with `enableTrace=True`, and
 asserts on the captured trace + final response. Writes a markdown report
-and exits non-zero on any failure. Wraps each invocation with a Langfuse
-trace.
+and exits non-zero on any failure. Each invocation emits a structured
+JSON line to the gagent CloudWatch invocation log group (AgentCore
+Observability native).
+
+The persona -> STS -> InvokeAgent -> CloudWatch Logs pipeline is delegated
+to `gagent_client` per ADR-006 step 1. This harness is one of four
+consumers (eval, MCP server, gra CLI, SMUS notebook); the lib is the
+asset, the harness is a thin shim.
 """
 
 from __future__ import annotations
@@ -16,16 +22,24 @@ import logging
 import os
 import re
 import sys
-import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import boto3
 import yaml
-from botocore.config import Config
 from botocore.exceptions import ClientError
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from gagent_client import (  # noqa: E402
+    InvocationResponse,
+    Persona,
+    TraceSummary,
+    invoke as agent_invoke,
+)
 
 logger = logging.getLogger("eval")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -68,20 +82,16 @@ def main(argv: list[str] | None = None) -> int:
     cases = _load_cases(args.prompts_dir)
     logger.info("loaded %d eval cases", len(cases))
 
-    langfuse = _init_langfuse(cfg.get("langfuse_secret_arn"), region)
+    log_group = cfg.get("invocation_log_group") or os.environ.get("GAGENT_LOG_GROUP")
 
     results: list[CaseResult] = []
     for case in cases:
-        result = _run_case(case, agent_id, agent_alias_id, region, persona_role_arns, langfuse)
+        result = _run_case(
+            case, agent_id, agent_alias_id, region, persona_role_arns, log_group,
+        )
         results.append(result)
         status = "PASS" if result.passed else "FAIL"
         logger.info("[%s] %s (%s)", status, case["id"], case["persona"])
-
-    if langfuse is not None:
-        try:
-            langfuse.flush()
-        except Exception:  # noqa: BLE001
-            logger.exception("langfuse flush failed")
 
     report_path = _write_report(results, args.report_dir)
     logger.info("wrote %s", report_path)
@@ -89,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _normalize_persona(name: str) -> str:
-    """Map case-and-camel input ("RegionalManager") to snake_case key ("regional_manager")."""
+    """Map case-and-camel input ("TechnicianLead") to snake_case key ("technician_lead")."""
     out = []
     for i, ch in enumerate(name):
         if ch.isupper() and i > 0 and not name[i - 1].isupper():
@@ -104,83 +114,69 @@ def _run_case(
     agent_alias_id: str,
     region: str,
     persona_role_arns: dict[str, str],
-    langfuse: Any,
+    log_group: str | None,
 ) -> CaseResult:
-    persona = case["persona"]
-    role_key = _normalize_persona(persona)
+    persona_name = case["persona"]
+    role_key = _normalize_persona(persona_name)
     role_arn = persona_role_arns.get(role_key)
     if not role_arn:
-        return CaseResult(case["id"], persona, case["prompt"], False,
-                          [f"no role ARN for persona {persona}"], "", {})
+        return CaseResult(case["id"], persona_name, case["prompt"], False,
+                          [f"no role ARN for persona {persona_name}"], "", _empty_summary())
 
-    region_tag = case.get("region")
+    service_region: str | None = None
+    if role_key == "technician_lead":
+        service_region = case.get("service_region") or case.get("region")
+
     try:
-        creds = _assume_persona(role_arn, role_key, region_tag)
-    except Exception as exc:  # noqa: BLE001
-        return CaseResult(case["id"], persona, case["prompt"], False,
-                          [f"AssumeRole error: {exc}"], "", {})
-
-    runtime = boto3.client(
-        "bedrock-agent-runtime",
-        region_name=region,
-        aws_access_key_id=creds["AccessKeyId"],
-        aws_secret_access_key=creds["SecretAccessKey"],
-        aws_session_token=creds["SessionToken"],
-        config=Config(read_timeout=300, connect_timeout=10, retries={"max_attempts": 1}),
-    )
-
-    session_attrs = {"role": role_key}
-    if region_tag:
-        session_attrs["region"] = region_tag
-
-    trace_summary = {"tools_called": [], "guardrail_blocks": 0, "guardrail_events": []}
-    response_text_parts: list[str] = []
-
-    lf_trace = _start_langfuse_trace(langfuse, case)
-    started = time.time()
-    try:
-        response = runtime.invoke_agent(
-            agentId=agent_id,
-            agentAliasId=agent_alias_id,
-            sessionId=f"eval-{case['id']}-{uuid.uuid4().hex[:6]}",
-            inputText=case["prompt"],
-            enableTrace=True,
-            sessionState={"sessionAttributes": session_attrs},
+        persona = Persona(
+            role=role_key, role_arn=role_arn, service_region=service_region,
         )
-        for event in response["completion"]:
-            if "chunk" in event:
-                response_text_parts.append(event["chunk"]["bytes"].decode("utf-8"))
-            elif "trace" in event:
-                _summarize_trace(event["trace"], trace_summary)
+    except ValueError as exc:
+        return CaseResult(case["id"], persona_name, case["prompt"], False,
+                          [f"persona construction failed: {exc}"], "", _empty_summary())
+
+    try:
+        response: InvocationResponse = agent_invoke(
+            case["prompt"],
+            persona,
+            agent_id=agent_id,
+            agent_alias_id=agent_alias_id,
+            region=region,
+            session_id=f"eval-{case['id']}-{uuid.uuid4().hex[:6]}",
+            enable_trace=True,
+            surface="eval",
+            trace_name=case["id"],
+            trace_metadata={
+                "persona": persona_name,
+                "source": case.get("_source"),
+            },
+            log_group=log_group,
+        )
     except ClientError as exc:
-        return CaseResult(case["id"], persona, case["prompt"], False,
-                          [f"InvokeAgent error: {exc}"], "", trace_summary)
+        return CaseResult(case["id"], persona_name, case["prompt"], False,
+                          [f"InvokeAgent error: {exc}"], "", _empty_summary())
     except Exception as exc:  # noqa: BLE001
-        return CaseResult(case["id"], persona, case["prompt"], False,
+        return CaseResult(case["id"], persona_name, case["prompt"], False,
                           [f"InvokeAgent error: {type(exc).__name__}: {exc}"],
-                          "".join(response_text_parts), trace_summary)
+                          "", _empty_summary())
 
-    response_text = "".join(response_text_parts)
-    failures = _apply_assertions(case.get("expect", {}), response_text, trace_summary)
-    _end_langfuse_trace(lf_trace, response_text, trace_summary, time.time() - started)
+    trace_summary = _summary_to_dict(response.trace_summary)
+    failures = _apply_assertions(case.get("expect", {}), response.text, trace_summary)
 
-    return CaseResult(case["id"], persona, case["prompt"], not failures,
-                      failures, response_text, trace_summary)
+    return CaseResult(case["id"], persona_name, case["prompt"], not failures,
+                      failures, response.text, trace_summary)
 
 
-def _summarize_trace(trace: dict[str, Any], summary: dict[str, Any]) -> None:
-    orchestration = trace.get("trace", {}).get("orchestrationTrace", {})
-    invocation = orchestration.get("invocationInput", {})
-    if "actionGroupInvocationInput" in invocation:
-        ag = invocation["actionGroupInvocationInput"]
-        summary["tools_called"].append(ag.get("actionGroupName", ""))
+def _summary_to_dict(summary: TraceSummary) -> dict[str, Any]:
+    return {
+        "tools_called": list(summary.tools_called),
+        "guardrail_blocks": summary.guardrail_blocks,
+        "guardrail_events": list(summary.guardrail_events),
+    }
 
-    gr = trace.get("trace", {}).get("guardrailTrace", {})
-    if gr:
-        action = gr.get("action") or ""
-        if action.upper() in ("INTERVENED", "BLOCKED"):
-            summary["guardrail_blocks"] += 1
-        summary["guardrail_events"].append({"action": action})
+
+def _empty_summary() -> dict[str, Any]:
+    return {"tools_called": [], "guardrail_blocks": 0, "guardrail_events": []}
 
 
 def _apply_assertions(
@@ -236,26 +232,11 @@ def _normalize_expectations(expect: Any) -> dict[str, Any]:
     return {}
 
 
-def _assume_persona(role_arn: str, role_key: str, region_tag: str | None) -> dict[str, str]:
-    sts = boto3.client("sts")
-    tags = [{"Key": "role", "Value": role_key}]
-    if region_tag:
-        tags.append({"Key": "region", "Value": region_tag})
-    response = sts.assume_role(
-        RoleArn=role_arn,
-        RoleSessionName=f"eval-{role_key}-{uuid.uuid4().hex[:6]}",
-        Tags=tags,
-        TransitiveTagKeys=[t["Key"] for t in tags],
-        DurationSeconds=900,
-    )
-    return response["Credentials"]
-
-
 def _persona_role_arns_from_outputs(cfg: dict[str, Any], args: argparse.Namespace) -> dict[str, str]:
     return {
-        "analyst": args.analyst_role_arn or cfg.get("analyst_role_arn", ""),
-        "regional_manager": args.regional_manager_role_arn or cfg.get("regional_manager_role_arn", ""),
-        "admin": args.admin_role_arn or cfg.get("admin_role_arn", ""),
+        "dispatcher": args.dispatcher_role_arn or cfg.get("dispatcher_role_arn", ""),
+        "technician_lead": args.technician_lead_role_arn or cfg.get("technician_lead_role_arn", ""),
+        "owner": args.owner_role_arn or cfg.get("owner_role_arn", ""),
     }
 
 
@@ -279,53 +260,6 @@ def _load_cases(prompts_dir: Path) -> list[dict[str, Any]]:
             case["_source"] = path.name
             cases.append(case)
     return cases
-
-
-def _init_langfuse(secret_arn: str | None, region: str) -> Any:
-    if not secret_arn:
-        return None
-    try:
-        secrets = boto3.client("secretsmanager", region_name=region)
-        raw = secrets.get_secret_value(SecretId=secret_arn)["SecretString"]
-        creds = json.loads(raw)
-        from langfuse import Langfuse
-        return Langfuse(
-            public_key=creds["public_key"],
-            secret_key=creds["secret_key"],
-            host=creds.get("host", "https://cloud.langfuse.com"),
-        )
-    except Exception:  # noqa: BLE001
-        logger.exception("langfuse init failed; continuing without traces")
-        return None
-
-
-def _start_langfuse_trace(langfuse: Any, case: dict[str, Any]) -> Any:
-    if langfuse is None:
-        return None
-    try:
-        return langfuse.trace(
-            name=case["id"],
-            input=case["prompt"],
-            metadata={"persona": case["persona"], "source": case.get("_source")},
-        )
-    except Exception:  # noqa: BLE001
-        return None
-
-
-def _end_langfuse_trace(trace: Any, output: str, summary: dict[str, Any], duration_s: float) -> None:
-    if trace is None:
-        return
-    try:
-        trace.update(
-            output=output,
-            metadata={
-                "tools_called": summary["tools_called"],
-                "guardrail_blocks": summary["guardrail_blocks"],
-                "duration_seconds": duration_s,
-            },
-        )
-    except Exception:  # noqa: BLE001
-        pass
 
 
 def _write_report(results: list[CaseResult], report_dir: Path) -> Path:
@@ -388,9 +322,9 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--region", default=os.environ.get("AWS_REGION", "us-east-1"))
     p.add_argument("--agent-id")
     p.add_argument("--agent-alias-id")
-    p.add_argument("--analyst-role-arn")
-    p.add_argument("--regional-manager-role-arn")
-    p.add_argument("--admin-role-arn")
+    p.add_argument("--dispatcher-role-arn")
+    p.add_argument("--technician-lead-role-arn")
+    p.add_argument("--owner-role-arn")
     return p.parse_args(argv)
 
 

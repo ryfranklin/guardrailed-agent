@@ -6,7 +6,7 @@ Deployment for the ms3dm.tech `Demo` account. Composes the data-plane, identity,
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
-# fill in langfuse_public_key, langfuse_secret_key
+# tweak settings as needed (defaults are usually fine)
 terraform init
 terraform plan
 terraform apply
@@ -25,7 +25,7 @@ Then seed data and run the smoke test from the repo root:
 
 ## Inputs
 
-See `variables.tf`. The required ones are `langfuse_public_key` and `langfuse_secret_key`. Everything else has a sensible default.
+See `variables.tf`. None are required — every variable has a sensible default. Observability now uses the AgentCore-native CloudWatch log group `/gagent/invocations` (override via `invocation_log_group` / `invocation_log_retention_days`); the previously-required `langfuse_public_key` / `langfuse_secret_key` are gone.
 
 ## Outputs
 

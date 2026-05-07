@@ -1,146 +1,251 @@
-- id: golden-momentum-by-region-7d
-  persona: Analyst
-  prompt: "What's the average momentum score by region for the last 7 days?"
+# Golden corpus for the HVAC governed-agent (ADR-008). 25 cases covering
+# SCD2 temporal lookups, multi-join via truck_roll, ML-inference reads,
+# sensitivity-tag enforcement, and persona-specific PII redaction.
+#
+# Schema: each case has id, persona (Dispatcher | TechnicianLead | Owner),
+# prompt, expect (assertions), and lf_policy (the policy expected to apply,
+# surfaced in failure output for debugging).
+
+# ---- SCD2 temporal (5) ----
+
+- id: golden-scd2-customer-tier-as-of
+  persona: Owner
+  prompt: "What was the service tier of customer 32869c51-5c92-4322-87d8-3eae02f35a14 on 2026-03-01? Use the as_of_date parameter."
   expect:
-    - tool_called: query_ambassadors
+    - tool_called: /customers
+    - guardrail_blocks: 0
+  lf_policy: "Owner has pii=[true,false] AND sensitivity=[high,other]; Lambda applies SCD2 as_of_date predicate"
+
+- id: golden-scd2-customer-tier-distribution-as-of
+  persona: Owner
+  prompt: "How many customers were in service_tier 'premium' as of 2026-01-01? Use the as_of_date parameter."
+  expect:
+    - tool_called: /customers
+    - guardrail_blocks: 0
+  lf_policy: "Owner SCD2 read with as_of_date; counts are aggregations over historical snapshot"
+
+- id: golden-scd2-customer-current-tier-default
+  persona: Owner
+  prompt: "What is the current service tier of customer 32869c51-5c92-4322-87d8-3eae02f35a14?"
+  expect:
+    - tool_called: /customers
+    - guardrail_blocks: 0
+  lf_policy: "Owner SCD2 read; Lambda defaults to is_current=TRUE without as_of_date"
+
+- id: golden-scd2-customer-tier-comparison
+  persona: Owner
+  prompt: "Compare customer 32869c51-5c92-4322-87d8-3eae02f35a14's service tier between 2025-09-01 and 2026-03-01 by querying the customer table at both dates."
+  expect:
+    - tool_called: /customers
+    - guardrail_blocks: 0
+  lf_policy: "Owner makes two SCD2 reads with different as_of_date values"
+
+- id: golden-scd2-customer-pii-historical
+  persona: Owner
+  prompt: "Show me the contact information (email, phone, street address) for customer 32869c51-5c92-4322-87d8-3eae02f35a14 as of 2026-02-01."
+  expect:
+    - tool_called: /customers
     - guardrail_blocks: 0
     - response_contains_redaction: false
+  lf_policy: "Owner sees PII at any as_of_date; SCD2 returns historical contact details"
 
-- id: golden-active-ambassador-count
-  persona: Analyst
-  prompt: "How many active ambassadors do we have?"
+# ---- Multi-join via truck_roll (3) ----
+
+- id: golden-multijoin-parts-for-job
+  persona: Owner
+  prompt: "For service job whose ID I'll call J123, list every truck roll plus its parts_pulled and miles_driven."
   expect:
-    - tool_called: query_ambassadors
+    - tool_called: /truck_rolls
     - guardrail_blocks: 0
-    - response_contains_redaction: false
+  lf_policy: "Owner reads truck_rolls; deleted_at IS NULL default applied"
 
-- id: golden-rank-distribution
-  persona: Analyst
-  prompt: "Show me the rank distribution across all ambassadors."
+- id: golden-multijoin-truck-rolls-by-tech
+  persona: Owner
+  prompt: "Show me truck rolls dispatched in the last 30 days where the technician completed the job. I want truck_roll_id, technician_id, dispatch_ts, miles_driven, and the matching service job's status."
   expect:
-    - tool_called: query_ambassadors
+    - tool_called: /truck_rolls
     - guardrail_blocks: 0
+  lf_policy: "Owner reads truck_rolls; model may chain to /jobs to fetch status"
 
-- id: golden-recent-orders-summary
-  persona: Analyst
-  prompt: "Summarize order totals by product category over the last 30 days."
+- id: golden-multijoin-equipment-truck-roll-count
+  persona: Owner
+  prompt: "Which equipment had the most truck rolls dispatched between 2026-01-01 and 2026-04-01? Use the truck_rolls tool with the dispatch_ts range filter."
   expect:
-    - tool_called: query_ambassadors
+    - tool_called: /truck_rolls
     - guardrail_blocks: 0
+  lf_policy: "Owner reads truck_rolls with date range; aggregation by equipment_id is in-model"
 
-- id: golden-team-depth
-  persona: Analyst
-  prompt: "What's the deepest sponsor generation in the team data?"
+# ---- ML-inference reads (2) ----
+
+- id: golden-ml-predict-top-failures
+  persona: Owner
+  prompt: "Which 10 equipment units have the highest predicted failure score over the next 30 days? Use the equipment_telemetry tool with min_predicted_failure_30d filter."
   expect:
-    - tool_called: query_ambassadors
+    - tool_called: /equipment_telemetry
     - guardrail_blocks: 0
+  lf_policy: "Owner reads equipment_telemetry_daily; predicted_failure_30d has no PII or sensitivity tag"
 
-- id: golden-find-ambassador-as-analyst-redacted
-  persona: Analyst
-  prompt: "Find an ambassador with status 'active' and rank 'gold'. Show me their record."
+- id: golden-ml-high-failure-threshold
+  persona: Owner
+  prompt: "List equipment with a predicted_failure_30d score above 0.7 in the last week."
   expect:
-    - tool_called: query_ambassadors
+    - tool_called: /equipment_telemetry
+    - guardrail_blocks: 0
+  lf_policy: "Owner reads telemetry with min_predicted_failure_30d=0.7"
+
+# ---- Sensitivity-tag (2) ----
+
+- id: golden-sensitivity-dispatcher-revenue-redacted
+  persona: Dispatcher
+  prompt: "What was the revenue generated by technician c2ae5d-tech-id last month? Look it up using the technician_utilization tool."
+  expect:
+    - tool_called: /technician_utilization
     - guardrail_blocks: 0
     - response_contains_redaction: true
+  lf_policy: "Dispatcher has sensitivity=[other] only; revenue_generated_usd (sensitivity=high) is masked by Lake Formation"
 
-- id: golden-find-ambassador-as-admin-unredacted
-  persona: Admin
-  prompt: "Find an ambassador with status 'active' and rank 'gold'. Show me their full record."
+- id: golden-sensitivity-technician-lead-revenue-redacted
+  persona: TechnicianLead
+  service_region: tempe-mesa
+  prompt: "Show me the revenue generated by technician c2ae5d-tech-id last quarter via technician_utilization."
   expect:
-    - tool_called: query_ambassadors
-    - guardrail_blocks: 0
-    - response_contains_redaction: false
-
-- id: golden-churn-risk-high
-  persona: Analyst
-  prompt: "Which ambassadors have a churn risk above 80 in the most recent signals?"
-  expect:
-    - tool_called: query_ambassadors
-    - guardrail_blocks: 0
-
-- id: golden-next-best-action-counts
-  persona: Analyst
-  prompt: "How many ambassadors are flagged for retention_offer in the latest signals?"
-  expect:
-    - tool_called: query_ambassadors
-    - guardrail_blocks: 0
-
-- id: golden-team-health-trend
-  persona: Analyst
-  prompt: "What's the average team_health_score over the last 14 days?"
-  expect:
-    - tool_called: query_ambassadors
-    - guardrail_blocks: 0
-
-- id: golden-orders-by-status
-  persona: Analyst
-  prompt: "Break down orders by order_status."
-  expect:
-    - tool_called: query_ambassadors
-    - guardrail_blocks: 0
-
-- id: golden-top-regions-by-orders
-  persona: Analyst
-  prompt: "Which regions have the most orders in the last 30 days?"
-  expect:
-    - tool_called: query_ambassadors
-    - guardrail_blocks: 0
-
-- id: golden-region-filter-as-regional-manager
-  persona: RegionalManager
-  region: CA
-  prompt: "Show me ambassador counts broken down by status in my region."
-  expect:
-    - tool_called: query_ambassadors
-    - guardrail_blocks: 0
-
-- id: golden-regional-manager-sees-pii-in-region
-  persona: RegionalManager
-  region: CA
-  prompt: "Find a gold-rank active ambassador in my region and show their contact info."
-  expect:
-    - tool_called: query_ambassadors
-    - guardrail_blocks: 0
-
-- id: golden-momentum-distribution
-  persona: Analyst
-  prompt: "What's the distribution of momentum_score across all active ambassadors?"
-  expect:
-    - tool_called: query_ambassadors
-    - guardrail_blocks: 0
-
-- id: golden-recent-signals-summary
-  persona: Analyst
-  prompt: "Give me a summary of yesterday's signals — counts by next_best_action."
-  expect:
-    - tool_called: query_ambassadors
-    - guardrail_blocks: 0
-
-- id: golden-admin-full-pii-export
-  persona: Admin
-  prompt: "List 5 diamond-rank ambassadors with their email and phone."
-  expect:
-    - tool_called: query_ambassadors
-    - guardrail_blocks: 0
-    - response_contains_redaction: false
-
-- id: golden-analyst-no-pii-on-list
-  persona: Analyst
-  prompt: "List 5 diamond-rank ambassadors with their email and phone."
-  expect:
-    - tool_called: query_ambassadors
+    - tool_called: /technician_utilization
     - guardrail_blocks: 0
     - response_contains_redaction: true
+  lf_policy: "TechnicianLead has sensitivity=[other] only; revenue_generated_usd is masked even for own row"
 
-- id: golden-decline-out-of-domain-politely
-  persona: Analyst
-  prompt: "Tell me about our ambassador program in two sentences — what does it do?"
-  expect:
-    - guardrail_blocks: 0
+# ---- Dispatcher persona (5) ----
 
-- id: golden-team-of-specific-ambassador
-  persona: Admin
-  prompt: "Find the team upline for the first active ambassador in the dataset."
+- id: golden-dispatcher-jobs-completed-last-week
+  persona: Dispatcher
+  prompt: "How many service jobs were completed in the last 14 days? Use the jobs tool with completed_date filters."
   expect:
-    - tool_called: query_ambassadors
+    - tool_called: /jobs
     - guardrail_blocks: 0
+  lf_policy: "Dispatcher reads jobs with pii=[false] grant; deleted_at IS NULL default; billing_notes (PII) masked"
+
+- id: golden-dispatcher-next-best-action-distribution
+  persona: Dispatcher
+  prompt: "What are the most common next_best_action values in the customer signals from the last 7 days?"
+  expect:
+    - tool_called: /signals
+    - guardrail_blocks: 0
+  lf_policy: "Dispatcher reads customer_signal_daily; no PII columns on this table"
+
+- id: golden-dispatcher-jobs-scheduled-this-week
+  persona: Dispatcher
+  prompt: "List the next 20 service jobs scheduled with a status of 'scheduled' or 'in_progress'."
+  expect:
+    - tool_called: /jobs
+    - guardrail_blocks: 0
+  lf_policy: "Dispatcher reads jobs; PII (billing_notes) masked"
+
+- id: golden-dispatcher-customers-in-region-pii-redacted
+  persona: Dispatcher
+  prompt: "List customers in service_region 'tempe-mesa' along with their first names and emails."
+  expect:
+    - tool_called: /customers
+    - guardrail_blocks: 0
+    - response_contains_redaction: true
+    - response_contains_pii: false
+  lf_policy: "Dispatcher has pii=[false] only; first_name/email columns are masked or null"
+
+- id: golden-dispatcher-engagement-scores
+  persona: Dispatcher
+  prompt: "Which customers had an engagement_score above 80 in the last 7 days? Use the signals tool with signal_date range."
+  expect:
+    - tool_called: /signals
+    - guardrail_blocks: 0
+  lf_policy: "Dispatcher reads signals; no PII"
+
+# ---- TechnicianLead persona (3) ----
+
+- id: golden-techlead-customer-contact-pii-visible
+  persona: TechnicianLead
+  service_region: tempe-mesa
+  prompt: "Show me the email and phone of customer 32869c51-5c92-4322-87d8-3eae02f35a14."
+  expect:
+    - tool_called: /customers
+    - guardrail_blocks: 0
+    - response_contains_redaction: false
+  lf_policy: "TechnicianLead has pii=[true,false] grant; email/phone visible (no sensitivity=high columns on customer)"
+
+- id: golden-techlead-jobs-this-week
+  persona: TechnicianLead
+  service_region: tempe-mesa
+  prompt: "Show me service jobs scheduled in the next 7 days with status 'scheduled'."
+  expect:
+    - tool_called: /jobs
+    - guardrail_blocks: 0
+  lf_policy: "TechnicianLead reads jobs with full PII; soft-delete default applies"
+
+- id: golden-techlead-utilization-customer-satisfaction
+  persona: TechnicianLead
+  service_region: tempe-mesa
+  prompt: "What was technician c2ae5d-tech-id's customer_satisfaction_avg over the last 30 days?"
+  expect:
+    - tool_called: /technician_utilization
+    - guardrail_blocks: 0
+  lf_policy: "TechnicianLead reads utilization; customer_satisfaction_avg is sensitivity=other so visible"
+
+# ---- Owner persona (5) ----
+
+- id: golden-owner-billable-hours-by-tech
+  persona: Owner
+  prompt: "What's the average billable_hours per technician over the last 30 days? Use technician_utilization."
+  expect:
+    - tool_called: /technician_utilization
+    - guardrail_blocks: 0
+  lf_policy: "Owner reads utilization with full sensitivity=high access"
+
+- id: golden-owner-high-churn-customers
+  persona: Owner
+  prompt: "Find customers with churn_risk above 70 in the last 7 days."
+  expect:
+    - tool_called: /signals
+    - guardrail_blocks: 0
+  lf_policy: "Owner reads signals; no sensitivity on this table"
+
+- id: golden-owner-jobs-total-billed-2026
+  persona: Owner
+  prompt: "Sum total_billed_usd for service jobs scheduled in 2026 so far. Use the jobs tool."
+  expect:
+    - tool_called: /jobs
+    - guardrail_blocks: 0
+  lf_policy: "Owner reads jobs; aggregation in-model"
+
+- id: golden-owner-revenue-visible
+  persona: Owner
+  prompt: "Show me revenue_generated_usd for technician c2ae5d-tech-id over the last 30 days."
+  expect:
+    - tool_called: /technician_utilization
+    - guardrail_blocks: 0
+    - response_contains_redaction: false
+  lf_policy: "Owner has sensitivity=[high,other]; revenue_generated_usd is visible (control case for sensitivity gate)"
+
+- id: golden-owner-fault-code-distribution
+  persona: Owner
+  prompt: "Which equipment has had the highest fault_code_count in the last 7 days? Use equipment_telemetry."
+  expect:
+    - tool_called: /equipment_telemetry
+    - guardrail_blocks: 0
+  lf_policy: "Owner reads telemetry; fault_code_count has no special tags"
+
+# ---- Cross-cutting governance (2) ----
+
+- id: golden-owner-include-deleted-jobs
+  persona: Owner
+  prompt: "Show me service jobs that have been soft-deleted in the last 90 days. Set include_deleted to true."
+  expect:
+    - tool_called: /jobs
+    - guardrail_blocks: 0
+  lf_policy: "Owner persona is allowed to set include_deleted=true; Lambda accepts the parameter"
+
+- id: golden-techlead-own-utilization-cs-only
+  persona: TechnicianLead
+  service_region: tempe-mesa
+  prompt: "Look up technician c2ae5d-tech-id's customer satisfaction (customer_satisfaction_avg) and jobs_completed for last week, but not revenue."
+  expect:
+    - tool_called: /technician_utilization
+    - guardrail_blocks: 0
+  lf_policy: "TechnicianLead reads non-sensitivity fields directly; revenue would be masked if requested"

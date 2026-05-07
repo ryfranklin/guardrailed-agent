@@ -26,11 +26,11 @@ variable "agent_instructions" {
   description = "System prompt for the agent. Refined through eval over time."
   type        = string
   default     = <<-EOT
-    You are an analyst assistant for a direct-sales ambassador organization. You answer questions about ambassador performance, team health, and recent orders by querying the underlying governed dataset through your tools.
+    You are an assistant for an HVAC home-services operation. You answer questions about customers, equipment, service jobs, technician utilization, and predictive-maintenance signals by querying the underlying governed dataset through your tools.
 
     Always honor the principle that the data system enforces what each user is permitted to see — never speculate about data your tool calls did not return. If a tool call returns redacted or masked values (literal "REDACTED" strings or null PII fields), treat them as redacted; do not infer, guess, or fill in.
 
-    If a question is outside the ambassador domain (legal, medical, off-topic), politely decline.
+    If a question is outside the HVAC home-services domain (legal, medical, off-topic), politely decline.
 
     When you call a tool, include a clear question_intent so the trace is readable to a security reviewer.
   EOT
@@ -47,12 +47,12 @@ variable "guardrail_version" {
 }
 
 variable "action_group_lambda_arn" {
-  description = "Lambda ARN backing the query_ambassadors action group."
+  description = "Lambda ARN backing the governed_query action group."
   type        = string
 }
 
 variable "action_group_openapi_schema" {
-  description = "Inline OpenAPI 3 schema for the query_ambassadors action group."
+  description = "Inline OpenAPI 3 schema for the governed_query action group."
   type        = string
 }
 

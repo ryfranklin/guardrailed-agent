@@ -22,22 +22,16 @@ variable "trusted_assumer_arns" {
   default     = []
 }
 
-variable "langfuse_host" {
-  description = "Langfuse host URL."
+variable "invocation_log_group" {
+  description = "CloudWatch log group for the gagent invocation telemetry stream. Surfaced by AgentCore Observability alongside the agent's auto-emitted X-Ray traces."
   type        = string
-  default     = "https://cloud.langfuse.com"
+  default     = "/gagent/invocations"
 }
 
-variable "langfuse_public_key" {
-  description = "Langfuse public key."
-  type        = string
-  sensitive   = true
-}
-
-variable "langfuse_secret_key" {
-  description = "Langfuse secret key."
-  type        = string
-  sensitive   = true
+variable "invocation_log_retention_days" {
+  description = "Retention for the invocation log group. Default 30 days for the demo; client deployments may want longer."
+  type        = number
+  default     = 30
 }
 
 variable "smus_reader_role_arns" {

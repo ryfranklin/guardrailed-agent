@@ -9,30 +9,47 @@ terraform {
 }
 
 locals {
-  secret_name = "${var.name_prefix}${var.env}/langfuse"
+  log_group_name = var.log_group_name
 }
 
-resource "aws_secretsmanager_secret" "langfuse" {
-  name                    = local.secret_name
-  description             = "Langfuse credentials for the ${var.env} guardrailed-agent. Read by the Lambda action group, eval runner, and invoke-agent CLI."
-  recovery_window_in_days = var.recovery_window_in_days
-  tags                    = var.tags
+resource "aws_cloudwatch_log_group" "invocations" {
+  name              = local.log_group_name
+  retention_in_days = var.log_retention_days
+  tags              = var.tags
 }
 
-resource "aws_secretsmanager_secret_version" "langfuse" {
-  secret_id = aws_secretsmanager_secret.langfuse.id
-  secret_string = jsonencode({
-    host       = var.langfuse_host
-    public_key = var.langfuse_public_key
-    secret_key = var.langfuse_secret_key
-  })
-}
-
-data "aws_iam_policy_document" "langfuse_read" {
+data "aws_iam_policy_document" "invocations_write" {
   statement {
-    sid       = "ReadLangfuseSecret"
-    effect    = "Allow"
-    actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_secretsmanager_secret.langfuse.arn]
+    sid    = "WriteInvocationLogs"
+    effect = "Allow"
+    actions = [
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+      "logs:DescribeLogStreams",
+    ]
+    resources = [
+      aws_cloudwatch_log_group.invocations.arn,
+      "${aws_cloudwatch_log_group.invocations.arn}:*",
+    ]
+  }
+}
+
+data "aws_iam_policy_document" "invocations_read" {
+  statement {
+    sid    = "ReadInvocationLogs"
+    effect = "Allow"
+    actions = [
+      "logs:StartQuery",
+      "logs:StopQuery",
+      "logs:GetQueryResults",
+      "logs:DescribeQueries",
+      "logs:GetLogEvents",
+      "logs:FilterLogEvents",
+      "logs:DescribeLogStreams",
+    ]
+    resources = [
+      aws_cloudwatch_log_group.invocations.arn,
+      "${aws_cloudwatch_log_group.invocations.arn}:*",
+    ]
   }
 }

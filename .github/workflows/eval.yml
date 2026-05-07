@@ -10,6 +10,8 @@ on:
       - "eval/**"
       - "lambdas/**"
       - "terraform/**"
+      - "mcp_server/**"
+      - "gagent_client/**"
       - ".github/workflows/eval.yml"
 
 permissions:
@@ -29,8 +31,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - run: pip install -r lambdas/query_ambassadors/requirements.txt pytest==8.2.0
-      - run: pytest lambdas/query_ambassadors/tests -v
+      - run: pip install -r lambdas/governed_query/requirements.txt pytest==8.2.0
+      - run: pytest lambdas/governed_query/tests -v
+
+  # MCP / gagent_client / governance-tool unit tests. Pure-logic; no AWS.
+  # Runs on every push that touches the relevant paths above.
+  mcp-unit:
+    name: mcp-unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install runtime deps
+        run: |
+          pip install pytest==8.2.0
+          pip install -r mcp_server/requirements.txt
+      - run: pytest tests/gagent_client tests/mcp_server -v
 
   # Live agent-eval against the deployed Demo. Opt-in only — runs on the weekly
   # schedule and on manual workflow_dispatch. Not on every push because (a) it
@@ -65,7 +83,19 @@ jobs:
           python eval/runner.py \
             --agent-id "${{ steps.ids.outputs.agent_id }}" \
             --agent-alias-id "${{ steps.ids.outputs.alias_id }}" \
-            --analyst-role-arn "arn:aws:iam::${{ steps.ids.outputs.account_id }}:role/gagent-analyst-demo" \
-            --regional-manager-role-arn "arn:aws:iam::${{ steps.ids.outputs.account_id }}:role/gagent-regional-manager-demo" \
-            --admin-role-arn "arn:aws:iam::${{ steps.ids.outputs.account_id }}:role/gagent-admin-demo" \
+            --dispatcher-role-arn "arn:aws:iam::${{ steps.ids.outputs.account_id }}:role/gagent-dispatcher-demo" \
+            --technician-lead-role-arn "arn:aws:iam::${{ steps.ids.outputs.account_id }}:role/gagent-technician-lead-demo" \
+            --owner-role-arn "arn:aws:iam::${{ steps.ids.outputs.account_id }}:role/gagent-owner-demo" \
             --tf-dir ""
+
+      - name: Run governance-diff acceptance test (ADR-009 Phase 2.b)
+        env:
+          RUN_INTEGRATION: "1"
+          GAGENT_DISPATCHER_ROLE_ARN: arn:aws:iam::${{ steps.ids.outputs.account_id }}:role/gagent-dispatcher-demo
+          GAGENT_TECHNICIAN_LEAD_ROLE_ARN: arn:aws:iam::${{ steps.ids.outputs.account_id }}:role/gagent-technician-lead-demo
+          GAGENT_OWNER_ROLE_ARN: arn:aws:iam::${{ steps.ids.outputs.account_id }}:role/gagent-owner-demo
+          GAGENT_AGENT_ID: ${{ steps.ids.outputs.agent_id }}
+          GAGENT_AGENT_ALIAS_ID: ${{ steps.ids.outputs.alias_id }}
+        run: |
+          pip install -r mcp_server/requirements.txt
+          pytest tests/integration/test_governance_diff.py -v

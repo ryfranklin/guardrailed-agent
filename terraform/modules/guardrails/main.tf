@@ -26,8 +26,8 @@ locals {
 resource "aws_bedrock_guardrail" "this" {
   name                      = local.guardrail_name
   description               = "Guardrail for the ${var.env} guardrailed-agent: PII anonymization, prompt-injection defense, denied off-scope topics, contextual grounding."
-  blocked_input_messaging   = "I can't help with that. Please ask a question about ambassador performance, team health, orders, or signals."
-  blocked_outputs_messaging = "I'm not able to share that response. Please rephrase or ask a different question about the ambassador dataset."
+  blocked_input_messaging   = "I can't help with that. Please ask a question about customers, service jobs, equipment telemetry, technician utilization, or truck rolls."
+  blocked_outputs_messaging = "I'm not able to share that response. Please rephrase or ask a different question about the HVAC home-services dataset."
 
   content_policy_config {
     dynamic "filters_config" {

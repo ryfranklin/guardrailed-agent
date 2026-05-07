@@ -1,4 +1,4 @@
-# Runtime deps for the query_ambassadors Lambda.
+# Runtime deps for the governed_query Lambda.
 # boto3 ships with the Lambda Python runtime, but we pin a known-good version
 # in case we ever bundle deps locally. Keep this minimal — no Bedrock-specific
 # glue beyond the action-group adapter in handler.py.

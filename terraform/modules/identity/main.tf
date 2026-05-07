@@ -22,9 +22,9 @@ locals {
   glue_catalog_arn = "arn:${local.partition}:glue:${local.region}:${local.account_id}:catalog"
 }
 
-data "aws_iam_policy_document" "persona_trust_analyst" {
+data "aws_iam_policy_document" "persona_trust_dispatcher" {
   statement {
-    sid     = "AllowAssumeWithRoleTagAnalyst"
+    sid     = "AllowAssumeWithRoleTagDispatcher"
     effect  = "Allow"
     actions = ["sts:AssumeRole", "sts:TagSession"]
 
@@ -36,7 +36,7 @@ data "aws_iam_policy_document" "persona_trust_analyst" {
     condition {
       test     = "StringEquals"
       variable = "aws:RequestTag/role"
-      values   = ["analyst"]
+      values   = ["dispatcher"]
     }
 
     condition {
@@ -47,9 +47,9 @@ data "aws_iam_policy_document" "persona_trust_analyst" {
   }
 }
 
-data "aws_iam_policy_document" "persona_trust_regional_manager" {
+data "aws_iam_policy_document" "persona_trust_technician_lead" {
   statement {
-    sid     = "AllowAssumeWithRoleTagRegionalManager"
+    sid     = "AllowAssumeWithRoleTagTechnicianLead"
     effect  = "Allow"
     actions = ["sts:AssumeRole", "sts:TagSession"]
 
@@ -61,26 +61,26 @@ data "aws_iam_policy_document" "persona_trust_regional_manager" {
     condition {
       test     = "StringEquals"
       variable = "aws:RequestTag/role"
-      values   = ["regional_manager"]
+      values   = ["technician_lead"]
     }
 
     condition {
       test     = "ForAllValues:StringEquals"
       variable = "aws:TagKeys"
-      values   = ["role", "region"]
+      values   = ["role", "service_region"]
     }
 
     condition {
       test     = "StringLike"
-      variable = "aws:RequestTag/region"
+      variable = "aws:RequestTag/service_region"
       values   = ["*"]
     }
   }
 }
 
-data "aws_iam_policy_document" "persona_trust_admin" {
+data "aws_iam_policy_document" "persona_trust_owner" {
   statement {
-    sid     = "AllowAssumeWithRoleTagAdmin"
+    sid     = "AllowAssumeWithRoleTagOwner"
     effect  = "Allow"
     actions = ["sts:AssumeRole", "sts:TagSession"]
 
@@ -92,7 +92,7 @@ data "aws_iam_policy_document" "persona_trust_admin" {
     condition {
       test     = "StringEquals"
       variable = "aws:RequestTag/role"
-      values   = ["admin"]
+      values   = ["owner"]
     }
 
     condition {
@@ -170,41 +170,41 @@ data "aws_iam_policy_document" "data_access" {
   }
 }
 
-resource "aws_iam_role" "analyst" {
-  name               = "${var.role_name_prefix}analyst-${var.env}"
-  description        = "Analyst persona - column-masked PII via Lake Formation LF-Tag policy."
-  assume_role_policy = data.aws_iam_policy_document.persona_trust_analyst.json
+resource "aws_iam_role" "dispatcher" {
+  name               = "${var.role_name_prefix}dispatcher-${var.env}"
+  description        = "Dispatcher persona - column-masked PII via Lake Formation LF-Tag policy. Front-desk view (ADR-008)."
+  assume_role_policy = data.aws_iam_policy_document.persona_trust_dispatcher.json
   tags               = var.tags
 }
 
-resource "aws_iam_role" "regional_manager" {
-  name               = "${var.role_name_prefix}regional-manager-${var.env}"
-  description        = "RegionalManager persona - full PII for assigned region only."
-  assume_role_policy = data.aws_iam_policy_document.persona_trust_regional_manager.json
+resource "aws_iam_role" "technician_lead" {
+  name               = "${var.role_name_prefix}technician-lead-${var.env}"
+  description        = "TechnicianLead persona - full PII for the assigned service_region only (ADR-008)."
+  assume_role_policy = data.aws_iam_policy_document.persona_trust_technician_lead.json
   tags               = var.tags
 }
 
-resource "aws_iam_role" "admin" {
-  name               = "${var.role_name_prefix}admin-${var.env}"
-  description        = "Admin persona - unrestricted access."
-  assume_role_policy = data.aws_iam_policy_document.persona_trust_admin.json
+resource "aws_iam_role" "owner" {
+  name               = "${var.role_name_prefix}owner-${var.env}"
+  description        = "Owner persona - unrestricted access including sensitivity=high columns (ADR-008)."
+  assume_role_policy = data.aws_iam_policy_document.persona_trust_owner.json
   tags               = var.tags
 }
 
-resource "aws_iam_role_policy" "analyst_data_access" {
+resource "aws_iam_role_policy" "dispatcher_data_access" {
   name   = "data-access"
-  role   = aws_iam_role.analyst.id
+  role   = aws_iam_role.dispatcher.id
   policy = data.aws_iam_policy_document.data_access.json
 }
 
-resource "aws_iam_role_policy" "regional_manager_data_access" {
+resource "aws_iam_role_policy" "technician_lead_data_access" {
   name   = "data-access"
-  role   = aws_iam_role.regional_manager.id
+  role   = aws_iam_role.technician_lead.id
   policy = data.aws_iam_policy_document.data_access.json
 }
 
-resource "aws_iam_role_policy" "admin_data_access" {
+resource "aws_iam_role_policy" "owner_data_access" {
   name   = "data-access"
-  role   = aws_iam_role.admin.id
+  role   = aws_iam_role.owner.id
   policy = data.aws_iam_policy_document.data_access.json
 }

@@ -9,6 +9,8 @@ tags: [handoff, claude-code, bootstrap, ms3dm, bedrock, guardrailed-agent]
 
 # Repo Bootstrap Brief — Guardrailed Agent (Bedrock-native)
 
+> **Historical document.** This brief captured Phase 1 scope at repo bootstrap (2026-04-25) and predates the ADR-008 pivot to the HVAC home-services dataset. Where this document mentions an "ambassador" schema (§8), the four ambassador-era tables, the `query_ambassadors` action group / Lambda, or the Analyst / RegionalManager / Admin personas, the live spec is now ADR-008 (twelve HVAC tables, `governed_query` action group, Dispatcher / TechnicianLead / Owner personas, `service_region` session tag). Read §1–§5 and §10–§17 as still-current; read §6–§9 in their pre-pivot context.
+
 **Audience:** Claude Code, starting a new repository for the ms3dm.tech *Guardrailed Agent over Governed Enterprise Data* flagship project.
 
 **Your job (in priority order):**
@@ -293,7 +295,7 @@ Provision a single Guardrail policy in `terraform/modules/guardrails/`. Attach i
 | **PII filters** | ANONYMIZE | `EMAIL`, `PHONE`, `US_SSN`, `ADDRESS`, `NAME` |
 | **Content filter — Prompt Attack** | HIGH | Critical for the demo; prompt injection is the headline threat |
 | **Content filter — Sexual / Hate / Violence / Insults** | HIGH | Default-on |
-| **Denied topics** | Custom list | Off-scope queries: "give me legal advice", "give me medical advice", any non-Plexalytics-domain content |
+| **Denied topics** | Custom list | Off-scope queries: "give me legal advice", "give me medical advice", any off-domain content |
 | **Word filters** | Empty for v1 | Reserved for client-specific extensions |
 | **Contextual grounding check** | ENABLED, threshold 0.7 | Reduces hallucination on factual answers |
 

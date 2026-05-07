@@ -34,19 +34,6 @@ The deploying principal must already be a Lake Formation administrator before it
 
 ## Rotations
 
-### Rotate Langfuse keys
-
-1. Generate a new public/secret pair in the Langfuse project settings.
-2. Update `terraform.tfvars`:
-   ```hcl
-   langfuse_public_key = "pk-lf-NEW"
-   langfuse_secret_key = "sk-lf-NEW"
-   ```
-3. `terraform apply` — the Secrets Manager entry updates in place.
-4. Delete the old keys in Langfuse.
-
-The Lambda and CLI read the secret on each invocation, so no restart required.
-
 ### Rotate the Lake Formation admin principal
 
 1. Add the new principal to `lf_admin_principal_arns` in `terraform.tfvars`.
@@ -88,7 +75,7 @@ Same as above, but the operator runs `terraform destroy` from the client-specifi
 
 - The two S3 buckets that need manual emptying (data + Athena results)
 - A reminder that CloudTrail events for the agent persist per their account's CloudTrail retention
-- Confirmation that the Langfuse project (cloud-hosted) is unaffected — they can disable it on their side
+- A reminder that the `/gagent/invocations` CloudWatch log group is retained per the configured `invocation_log_retention_days`
 
 ## CI / OIDC
 
@@ -107,6 +94,6 @@ Not yet built. When ready, add a CloudWatch dashboard pinned to:
 - Bedrock Agent invocation count + p95 latency
 - Lambda action group error rate
 - Guardrail intervention count by type
-- Langfuse trace ingest count
+- CloudWatch invocation log volume (`/gagent/invocations`)
 
 Track whatever metric the client cares about most prominently.

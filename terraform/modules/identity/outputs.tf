@@ -1,38 +1,38 @@
-output "analyst_role_arn" {
-  description = "ARN of the Analyst persona role."
-  value       = aws_iam_role.analyst.arn
+output "dispatcher_role_arn" {
+  description = "ARN of the Dispatcher persona role (front-desk view, ADR-008)."
+  value       = aws_iam_role.dispatcher.arn
 }
 
-output "analyst_role_name" {
-  description = "Name of the Analyst persona role."
-  value       = aws_iam_role.analyst.name
+output "dispatcher_role_name" {
+  description = "Name of the Dispatcher persona role."
+  value       = aws_iam_role.dispatcher.name
 }
 
-output "regional_manager_role_arn" {
-  description = "ARN of the RegionalManager persona role."
-  value       = aws_iam_role.regional_manager.arn
+output "technician_lead_role_arn" {
+  description = "ARN of the TechnicianLead persona role (ADR-008)."
+  value       = aws_iam_role.technician_lead.arn
 }
 
-output "regional_manager_role_name" {
-  description = "Name of the RegionalManager persona role."
-  value       = aws_iam_role.regional_manager.name
+output "technician_lead_role_name" {
+  description = "Name of the TechnicianLead persona role."
+  value       = aws_iam_role.technician_lead.name
 }
 
-output "admin_role_arn" {
-  description = "ARN of the Admin persona role."
-  value       = aws_iam_role.admin.arn
+output "owner_role_arn" {
+  description = "ARN of the Owner persona role (unrestricted, ADR-008)."
+  value       = aws_iam_role.owner.arn
 }
 
-output "admin_role_name" {
-  description = "Name of the Admin persona role."
-  value       = aws_iam_role.admin.name
+output "owner_role_name" {
+  description = "Name of the Owner persona role."
+  value       = aws_iam_role.owner.name
 }
 
 output "all_persona_role_arns" {
   description = "All three persona role ARNs in a list — convenient for Lake Formation grants and Lambda IAM."
   value = [
-    aws_iam_role.analyst.arn,
-    aws_iam_role.regional_manager.arn,
-    aws_iam_role.admin.arn,
+    aws_iam_role.dispatcher.arn,
+    aws_iam_role.technician_lead.arn,
+    aws_iam_role.owner.arn,
   ]
 }

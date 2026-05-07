@@ -1,16 +1,16 @@
-output "analyst_role_arn" {
-  description = "Analyst persona role ARN — pass to invoke-agent.py via --assume-role."
-  value       = module.identity.analyst_role_arn
+output "dispatcher_role_arn" {
+  description = "Dispatcher persona role ARN — pass to invoke-agent.py via --assume-role."
+  value       = module.identity.dispatcher_role_arn
 }
 
-output "regional_manager_role_arn" {
-  description = "RegionalManager persona role ARN."
-  value       = module.identity.regional_manager_role_arn
+output "technician_lead_role_arn" {
+  description = "TechnicianLead persona role ARN."
+  value       = module.identity.technician_lead_role_arn
 }
 
-output "admin_role_arn" {
-  description = "Admin persona role ARN."
-  value       = module.identity.admin_role_arn
+output "owner_role_arn" {
+  description = "Owner persona role ARN."
+  value       = module.identity.owner_role_arn
 }
 
 output "agent_id" {
@@ -39,21 +39,31 @@ output "athena_workgroup_name" {
 }
 
 output "glue_database_name" {
-  description = "Glue catalog database holding the four governed tables."
+  description = "Glue catalog database holding the governed tables (ADR-008)."
   value       = module.data_plane.glue_database_name
 }
 
-output "langfuse_secret_arn" {
-  description = "Secrets Manager ARN for Langfuse credentials."
-  value       = module.observability.langfuse_secret_arn
+output "invocation_log_group" {
+  description = "CloudWatch log group that gagent_client.emit_invocation_log writes structured trace JSON to. AgentCore Observability surfaces this in the CloudWatch console."
+  value       = module.observability.invocation_log_group
 }
 
-output "langfuse_host" {
-  description = "Langfuse host URL."
-  value       = module.observability.langfuse_host
+output "invocation_log_group_arn" {
+  description = "ARN of the gagent invocation log group."
+  value       = module.observability.invocation_log_group_arn
+}
+
+output "invocations_read_policy_json" {
+  description = "IAM policy document granting Logs Insights access on the invocation log group. Attach to operator / MCP / CLI principals that consume recent_traces / audit_trace."
+  value       = module.observability.invocations_read_policy_json
 }
 
 output "lambda_function_name" {
   description = "Lambda action group function name."
   value       = module.tools.lambda_function_name
+}
+
+output "mcp_governance_reader_policy_arn" {
+  description = "ARN of the read-only IAM policy for the MCP server's governance probe tools (ADR-009 Phase 2.b). Attach to the MCP-runner principal in client deployments where the operator is not admin."
+  value       = aws_iam_policy.mcp_governance_reader.arn
 }

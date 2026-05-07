@@ -1,19 +1,19 @@
-output "langfuse_secret_arn" {
-  description = "ARN of the Secrets Manager secret holding Langfuse credentials."
-  value       = aws_secretsmanager_secret.langfuse.arn
+output "invocation_log_group" {
+  description = "Name of the CloudWatch log group that gagent_client.emit_invocation_log writes structured trace JSON to."
+  value       = aws_cloudwatch_log_group.invocations.name
 }
 
-output "langfuse_secret_name" {
-  description = "Name of the Langfuse secret."
-  value       = aws_secretsmanager_secret.langfuse.name
+output "invocation_log_group_arn" {
+  description = "ARN of the gagent invocation log group."
+  value       = aws_cloudwatch_log_group.invocations.arn
 }
 
-output "langfuse_host" {
-  description = "Langfuse host URL — exposed for the eval runner and invoke CLI to read alongside the secret."
-  value       = var.langfuse_host
+output "invocations_write_policy_json" {
+  description = "IAM policy document granting CreateLogStream + PutLogEvents on the invocation log group. Attach to every persona role + Lambda role that needs to emit traces."
+  value       = data.aws_iam_policy_document.invocations_write.json
 }
 
-output "langfuse_read_policy_json" {
-  description = "IAM policy document granting GetSecretValue on the Langfuse secret. Attach to any caller that needs to read it."
-  value       = data.aws_iam_policy_document.langfuse_read.json
+output "invocations_read_policy_json" {
+  description = "IAM policy document granting Logs Insights query access. Attach to operator / read-only roles that consume recent_traces / audit_trace."
+  value       = data.aws_iam_policy_document.invocations_read.json
 }

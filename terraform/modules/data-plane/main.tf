@@ -158,6 +158,12 @@ resource "aws_lakeformation_lf_tag" "pii" {
   depends_on = [aws_lakeformation_data_lake_settings.this]
 }
 
+resource "aws_lakeformation_lf_tag" "sensitivity" {
+  key        = "sensitivity"
+  values     = ["high", "other"]
+  depends_on = [aws_lakeformation_data_lake_settings.this]
+}
+
 resource "aws_lakeformation_resource_lf_tag" "database" {
   database {
     name = aws_glue_catalog_database.this.name
@@ -168,8 +174,18 @@ resource "aws_lakeformation_resource_lf_tag" "database" {
   }
 }
 
-resource "aws_lakeformation_permissions" "admin_database" {
-  principal = var.admin_role_arn
+resource "aws_lakeformation_resource_lf_tag" "database_sensitivity" {
+  database {
+    name = aws_glue_catalog_database.this.name
+  }
+  lf_tag {
+    key   = aws_lakeformation_lf_tag.sensitivity.key
+    value = "other"
+  }
+}
+
+resource "aws_lakeformation_permissions" "owner_database" {
+  principal = var.owner_role_arn
 
   database {
     name = aws_glue_catalog_database.this.name
@@ -181,8 +197,8 @@ resource "aws_lakeformation_permissions" "admin_database" {
   depends_on = [aws_lakeformation_data_lake_settings.this]
 }
 
-resource "aws_lakeformation_permissions" "admin_lf_tag_pii" {
-  principal = var.admin_role_arn
+resource "aws_lakeformation_permissions" "owner_lf_tags" {
+  principal = var.owner_role_arn
 
   lf_tag_policy {
     resource_type = "TABLE"
@@ -191,16 +207,24 @@ resource "aws_lakeformation_permissions" "admin_lf_tag_pii" {
       key    = aws_lakeformation_lf_tag.pii.key
       values = ["true", "false"]
     }
+
+    expression {
+      key    = aws_lakeformation_lf_tag.sensitivity.key
+      values = ["high", "other"]
+    }
   }
 
   permissions                   = ["SELECT", "DESCRIBE"]
   permissions_with_grant_option = []
 
-  depends_on = [aws_lakeformation_lf_tag.pii]
+  depends_on = [
+    aws_lakeformation_lf_tag.pii,
+    aws_lakeformation_lf_tag.sensitivity,
+  ]
 }
 
-resource "aws_lakeformation_permissions" "analyst_lf_tag_non_pii" {
-  principal = var.analyst_role_arn
+resource "aws_lakeformation_permissions" "dispatcher_lf_tags" {
+  principal = var.dispatcher_role_arn
 
   lf_tag_policy {
     resource_type = "TABLE"
@@ -209,16 +233,24 @@ resource "aws_lakeformation_permissions" "analyst_lf_tag_non_pii" {
       key    = aws_lakeformation_lf_tag.pii.key
       values = ["false"]
     }
+
+    expression {
+      key    = aws_lakeformation_lf_tag.sensitivity.key
+      values = ["other"]
+    }
   }
 
   permissions                   = ["SELECT", "DESCRIBE"]
   permissions_with_grant_option = []
 
-  depends_on = [aws_lakeformation_lf_tag.pii]
+  depends_on = [
+    aws_lakeformation_lf_tag.pii,
+    aws_lakeformation_lf_tag.sensitivity,
+  ]
 }
 
-resource "aws_lakeformation_permissions" "regional_manager_lf_tag_all" {
-  principal = var.regional_manager_role_arn
+resource "aws_lakeformation_permissions" "technician_lead_lf_tags" {
+  principal = var.technician_lead_role_arn
 
   lf_tag_policy {
     resource_type = "TABLE"
@@ -227,16 +259,24 @@ resource "aws_lakeformation_permissions" "regional_manager_lf_tag_all" {
       key    = aws_lakeformation_lf_tag.pii.key
       values = ["true", "false"]
     }
+
+    expression {
+      key    = aws_lakeformation_lf_tag.sensitivity.key
+      values = ["other"]
+    }
   }
 
   permissions                   = ["SELECT", "DESCRIBE"]
   permissions_with_grant_option = []
 
-  depends_on = [aws_lakeformation_lf_tag.pii]
+  depends_on = [
+    aws_lakeformation_lf_tag.pii,
+    aws_lakeformation_lf_tag.sensitivity,
+  ]
 }
 
-resource "aws_lakeformation_permissions" "analyst_database_describe" {
-  principal = var.analyst_role_arn
+resource "aws_lakeformation_permissions" "dispatcher_database_describe" {
+  principal = var.dispatcher_role_arn
 
   database {
     name = aws_glue_catalog_database.this.name
@@ -248,8 +288,8 @@ resource "aws_lakeformation_permissions" "analyst_database_describe" {
   depends_on = [aws_lakeformation_data_lake_settings.this]
 }
 
-resource "aws_lakeformation_permissions" "regional_manager_database_describe" {
-  principal = var.regional_manager_role_arn
+resource "aws_lakeformation_permissions" "technician_lead_database_describe" {
+  principal = var.technician_lead_role_arn
 
   database {
     name = aws_glue_catalog_database.this.name

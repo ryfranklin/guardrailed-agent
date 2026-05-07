@@ -3,17 +3,17 @@
 region              = "us-east-1"
 foundation_model_id = "us.anthropic.claude-sonnet-4-6"
 
-# Langfuse credentials (cloud.langfuse.com). Stored in Secrets Manager at apply time.
-langfuse_host       = "https://cloud.langfuse.com"
-langfuse_public_key = "pk-lf-CHANGE-ME"
-langfuse_secret_key = "sk-lf-CHANGE-ME"
+# CloudWatch log group for invocation telemetry (AgentCore Observability native;
+# replaces the prior Langfuse stack). Defaults are usually fine.
+# invocation_log_group           = "/gagent/invocations"
+# invocation_log_retention_days  = 30
 
 # Optional: extra IAM principals beyond the deploying caller identity.
 # lf_admin_principal_arns = ["arn:aws:iam::123456789012:role/SomeOperatorRole"]
 # trusted_assumer_arns    = ["arn:aws:iam::123456789012:role/GitHubActionsCI"]
 
 # Optional: SageMaker Unified Studio project execution roles that should see the
-# governed database inside Studio. Each gets Admin-equivalent LF grants on the
+# governed database inside Studio. Each gets Owner-equivalent LF grants on the
 # database (SELECT on all tables + DESCRIBE on the db). Leave empty for clients
 # that don't use SMUS.
 # smus_reader_role_arns = [

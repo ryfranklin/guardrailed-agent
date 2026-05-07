@@ -1,6 +1,6 @@
 # Eval Harness
 
-Runs `prompts/golden.yaml` (must pass) and `prompts/red_team.yaml` (must block / refuse) against the deployed Bedrock Agent. Wrapped in Langfuse traces. Wired into CI via `.github/workflows/eval.yml`.
+Runs `prompts/golden.yaml` (must pass) and `prompts/red_team.yaml` (must block / refuse) against the deployed Bedrock Agent. Each invocation emits a structured JSON line to the gagent CloudWatch invocation log group (AgentCore Observability native). Wired into CI via `.github/workflows/eval.yml`.
 
 ```bash
 python runner.py
