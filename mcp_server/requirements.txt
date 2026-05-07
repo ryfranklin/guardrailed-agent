@@ -1,0 +1,4 @@
+# MCP server dependencies (ADR-009 Phase 2.a).
+# The MCP SDK is moving (ADR-006/009 risks); pin tightly and bump deliberately.
+mcp>=1.0,<2.0
+boto3>=1.34
