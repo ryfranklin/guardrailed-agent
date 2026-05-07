@@ -130,7 +130,16 @@ def emit_invocation_log(
             )
         except ClientError as exc:
             code = exc.response.get("Error", {}).get("Code", "")
-            if code != "ResourceAlreadyExistsException":
+            if code == "ResourceAlreadyExistsException":
+                pass
+            elif code == "ResourceNotFoundException":
+                logger.warning(
+                    "log group %s does not exist; skipping trace emission "
+                    "(run terraform apply to create it)",
+                    log_group,
+                )
+                return None
+            else:
                 raise
         client.put_log_events(
             logGroupName=log_group,

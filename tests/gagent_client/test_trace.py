@@ -192,6 +192,18 @@ class TestEmitInvocationLog:
         assert result is not None
         client.put_log_events.assert_called_once()
 
+    def test_missing_log_group_returns_none_without_putting(self, caplog):
+        client = MagicMock()
+        client.create_log_stream.side_effect = ClientError(
+            {"Error": {"Code": "ResourceNotFoundException", "Message": "no group"}},
+            "CreateLogStream",
+        )
+        with caplog.at_level("WARNING", logger="gagent_client.trace"):
+            result = _emit(client)
+        assert result is None
+        client.put_log_events.assert_not_called()
+        assert any("does not exist" in r.message for r in caplog.records)
+
     def test_unexpected_client_error_returns_none(self):
         client = MagicMock()
         client.create_log_stream.side_effect = ClientError(
