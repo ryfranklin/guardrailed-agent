@@ -314,7 +314,7 @@ def _infer_tool_from_sql(sql: str | None) -> str | None:
 RECENT_TRACES_FIELDS = (
     "@timestamp, session_id, persona, role_arn, role_session_name, "
     "surface, trace_name, duration_seconds, tools_called, "
-    "guardrail_blocks, input, output, started_at, finished_at, metadata"
+    "guardrail_blocks, `input`, `output`, started_at, finished_at, metadata"
 )
 
 DEFAULT_RECENT_TRACES_HOURS = 168
