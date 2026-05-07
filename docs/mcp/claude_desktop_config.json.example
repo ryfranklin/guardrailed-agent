@@ -1,0 +1,22 @@
+{
+  "_comment_README": "Sample Claude Desktop MCP server config for the gagent MCP. Copy into ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) or %APPDATA%\\Claude\\claude_desktop_config.json (Windows) and adjust paths/profile. Per ADR-009 Phase 2.a — Shape A only; do NOT use for multi-user surfaces.",
+  "_comment_PRECONDITIONS": "Requires (a) GAGENT_TRUSTED_OPERATOR=1 trust gate; (b) AWS credentials reachable for the persona role ARNs (typically AWS_PROFILE pointing at the demo account); (c) terraform-applied resources in terraform/envs/demo so role ARNs resolve.",
+
+  "mcpServers": {
+    "gagent": {
+      "command": "/absolute/path/to/repo/data/synthesizer/.venv/bin/python",
+      "args": [
+        "-m",
+        "mcp_server"
+      ],
+      "cwd": "/absolute/path/to/repo",
+      "env": {
+        "GAGENT_TRUSTED_OPERATOR": "1",
+        "AWS_PROFILE": "ms3dm-admin",
+        "AWS_REGION": "us-east-1",
+        "GAGENT_DEFAULT_PERSONA": "owner",
+        "GAGENT_TOKEN_BUDGET": "25000"
+      }
+    }
+  }
+}
