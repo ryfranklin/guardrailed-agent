@@ -1,0 +1,6 @@
+# Runtime deps for the gateway Lambda.
+# boto3/botocore ship with the Lambda Python runtime; pinned in case we ever
+# bundle deps locally. The shared gagent_client library is bundled by the
+# Terraform module via archive_file so it does not appear here.
+boto3==1.34.162
+botocore==1.34.162
