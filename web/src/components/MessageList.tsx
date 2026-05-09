@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 export type MessageRole = "user" | "assistant";
 
@@ -43,9 +45,17 @@ export function MessageList({ messages, pending }: MessageListProps) {
                 : "mr-auto border-slate-200 bg-white"
             }`}
           >
-            <div className="whitespace-pre-wrap text-sm text-slate-900">
-              {m.content}
-            </div>
+            {m.role === "assistant" ? (
+              <div className="prose prose-sm max-w-none text-slate-900 prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-code:text-rose-700 prose-code:before:content-none prose-code:after:content-none prose-headings:text-slate-900">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {m.content}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <div className="whitespace-pre-wrap text-sm text-slate-900">
+                {m.content}
+              </div>
+            )}
             {m.role === "assistant" && (m.toolsCalled?.length ||
               typeof m.durationSeconds === "number") && (
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
