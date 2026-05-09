@@ -22,6 +22,7 @@ REQUIRED_ENV = {
     "GAGENT_TECHNICIAN_LEAD_ROLE_ARN": "arn:aws:iam::1:role/tl",
     "GAGENT_OWNER_ROLE_ARN": "arn:aws:iam::1:role/o",
     "GAGENT_LOG_GROUP": "/gagent/invocations",
+    "GAGENT_GOVERNED_QUERY_LAMBDA_NAME": "gagent-governed-query-test",
 }
 
 
@@ -47,6 +48,7 @@ def _event(
     body: dict | str | None,
     claims: dict | None = None,
     headers: dict[str, str] | None = None,
+    route_key: str = "POST /ask",
 ) -> dict[str, Any]:
     request_context: dict[str, Any] = {}
     if claims is not None:
@@ -57,7 +59,7 @@ def _event(
         body_str = body
     return {
         "version": "2.0",
-        "routeKey": "POST /ask",
+        "routeKey": route_key,
         "headers": headers or {},
         "requestContext": request_context,
         "body": body_str,
@@ -524,3 +526,171 @@ class TestCors:
 def test_import_handler_callable():
     from lambdas.gateway.handler import handler as h
     assert callable(h)
+
+
+# ---- POST /preview ----
+
+
+def _governed_query_response_payload(
+    rows: list[dict[str, Any]],
+    *,
+    status: int = 200,
+    template: str = "query_customers",
+) -> dict[str, Any]:
+    """Shape of the synchronous Lambda invoke response payload."""
+    inner_body = json.dumps({
+        "rows": rows,
+        "row_count": len(rows),
+        "template": template,
+        "persona": "owner",
+        "question_intent": "data preview",
+    })
+    return {
+        "messageVersion": "1.0",
+        "response": {
+            "actionGroup": "governed_query",
+            "apiPath": "/customers",
+            "httpMethod": "POST",
+            "httpStatusCode": status,
+            "responseBody": {"application/json": {"body": inner_body}},
+        },
+        "sessionAttributes": {},
+        "promptSessionAttributes": {},
+    }
+
+
+def _stub_lambda_client(payload: dict[str, Any]):
+    """Build a fake boto3 lambda client that returns the given payload."""
+    import io
+
+    class _Resp:
+        def __init__(self, data):
+            self.data = data
+
+        def read(self):
+            return self.data
+
+    fake_payload = io.BytesIO(json.dumps(payload).encode("utf-8"))
+
+    class _FakeClient:
+        last_invoke_args: dict[str, Any] | None = None
+
+        def invoke(self, **kwargs):
+            self.last_invoke_args = kwargs
+            return {"StatusCode": 200, "Payload": _Resp(json.dumps(payload).encode("utf-8"))}
+
+    _ = fake_payload  # silence unused
+    return _FakeClient()
+
+
+class TestPreviewHappyPath:
+    def test_owner_preview_returns_rows(self, handler_module):
+        rows = [
+            {"customer_id": "c-1", "first_name": "Alice", "email": "a@example.com"},
+            {"customer_id": "c-2", "first_name": "Bob", "email": "b@example.com"},
+        ]
+        fake = _stub_lambda_client(_governed_query_response_payload(rows))
+        with patch.object(handler_module, "_get_lambda_client", return_value=fake):
+            event = _event(
+                route_key="POST /preview",
+                body={"table": "customers", "persona": "owner", "limit": 5},
+                claims=_claims(),
+            )
+            response = handler_module.handler(event, None)
+        assert response["statusCode"] == 200
+        body = json.loads(response["body"])
+        assert body["table"] == "customers"
+        assert body["persona"] == "owner"
+        assert body["row_count"] == 2
+        assert body["rows"][0]["first_name"] == "Alice"
+
+        # The synthesized invoke event should carry the persona role + the
+        # right apiPath into governed_query.
+        invoke_args = fake.last_invoke_args
+        assert invoke_args is not None
+        assert invoke_args["FunctionName"] == "gagent-governed-query-test"
+        invoke_payload = json.loads(invoke_args["Payload"])
+        assert invoke_payload["apiPath"] == "/customers"
+        assert invoke_payload["sessionAttributes"]["role"] == "owner"
+
+    def test_dispatcher_preview_passes_role_through(self, handler_module):
+        rows = [{"customer_id": "c-1", "first_name": "REDACTED", "email": None}]
+        fake = _stub_lambda_client(_governed_query_response_payload(rows))
+        with patch.object(handler_module, "_get_lambda_client", return_value=fake):
+            event = _event(
+                route_key="POST /preview",
+                body={"table": "customers", "persona": "dispatcher"},
+                claims=_claims(),
+            )
+            response = handler_module.handler(event, None)
+        assert response["statusCode"] == 200
+        body = json.loads(response["body"])
+        assert body["persona"] == "dispatcher"
+        assert body["rows"][0]["first_name"] == "REDACTED"
+
+    def test_technician_lead_preview_threads_service_region(self, handler_module):
+        rows: list[dict[str, Any]] = []
+        fake = _stub_lambda_client(_governed_query_response_payload(rows))
+        with patch.object(handler_module, "_get_lambda_client", return_value=fake):
+            event = _event(
+                route_key="POST /preview",
+                body={
+                    "table": "customers",
+                    "persona": "technician_lead",
+                    "service_region": "tempe-mesa",
+                },
+                claims=_claims(),
+            )
+            response = handler_module.handler(event, None)
+        assert response["statusCode"] == 200
+        invoke_payload = json.loads(fake.last_invoke_args["Payload"])
+        assert invoke_payload["sessionAttributes"]["service_region"] == "tempe-mesa"
+
+
+class TestPreviewBadRequests:
+    def test_unknown_table_returns_400(self, handler_module):
+        event = _event(
+            route_key="POST /preview",
+            body={"table": "secrets", "persona": "owner"},
+            claims=_claims(),
+        )
+        response = handler_module.handler(event, None)
+        assert response["statusCode"] == 400
+        assert json.loads(response["body"])["error"] == "invalid_table"
+
+    def test_missing_persona_returns_400(self, handler_module):
+        event = _event(
+            route_key="POST /preview",
+            body={"table": "customers"},
+            claims=_claims(),
+        )
+        response = handler_module.handler(event, None)
+        assert response["statusCode"] == 400
+        assert json.loads(response["body"])["error"] == "invalid_persona"
+
+    def test_non_int_limit_returns_400(self, handler_module):
+        event = _event(
+            route_key="POST /preview",
+            body={"table": "customers", "persona": "owner", "limit": "lots"},
+            claims=_claims(),
+        )
+        response = handler_module.handler(event, None)
+        assert response["statusCode"] == 400
+        assert json.loads(response["body"])["error"] == "invalid_limit"
+
+    def test_governed_query_returns_403_propagates(self, handler_module):
+        payload = _governed_query_response_payload(rows=[], status=403)
+        # The 403 is wrapped in the Bedrock action-group response; our handler
+        # should surface it as a preview_failed BadRequest -> 400 with the
+        # underlying error code in detail.
+        fake = _stub_lambda_client(payload)
+        with patch.object(handler_module, "_get_lambda_client", return_value=fake):
+            event = _event(
+                route_key="POST /preview",
+                body={"table": "jobs", "persona": "dispatcher"},
+                claims=_claims(),
+            )
+            response = handler_module.handler(event, None)
+        assert response["statusCode"] == 400
+        body = json.loads(response["body"])
+        assert body["error"] == "preview_failed"

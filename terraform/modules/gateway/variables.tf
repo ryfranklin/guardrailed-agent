@@ -85,6 +85,18 @@ variable "agent_alias_arn" {
   type        = string
 }
 
+# ---- governed_query Lambda (for the data-preview pass-through) ----
+
+variable "governed_query_lambda_arn" {
+  description = "ARN of the existing governed_query Lambda (action group implementation). Scoped target for the gateway Lambda's lambda:InvokeFunction grant on the /preview path."
+  type        = string
+}
+
+variable "governed_query_lambda_name" {
+  description = "Function name of the governed_query Lambda. Injected as GAGENT_GOVERNED_QUERY_LAMBDA_NAME on the gateway Lambda."
+  type        = string
+}
+
 # ---- Persona roles (from identity/ module) ----
 
 variable "persona_role_arns" {

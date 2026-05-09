@@ -85,6 +85,13 @@ data "aws_iam_policy_document" "lambda_policy" {
   }
 
   statement {
+    sid       = "InvokeGovernedQuery"
+    effect    = "Allow"
+    actions   = ["lambda:InvokeFunction"]
+    resources = [var.governed_query_lambda_arn]
+  }
+
+  statement {
     sid    = "EmitInvocationTrace"
     effect = "Allow"
     actions = [
@@ -162,15 +169,16 @@ resource "aws_lambda_function" "gateway" {
   environment {
     variables = merge(
       {
-        GAGENT_AGENT_ID                   = var.agent_id
-        GAGENT_AGENT_ALIAS_ID             = var.agent_alias_id
-        GAGENT_DISPATCHER_ROLE_ARN        = var.persona_role_arns["dispatcher"]
-        GAGENT_TECHNICIAN_LEAD_ROLE_ARN   = var.persona_role_arns["technician_lead"]
-        GAGENT_OWNER_ROLE_ARN             = var.persona_role_arns["owner"]
-        GAGENT_LOG_GROUP                  = var.invocation_log_group
-        GAGENT_GATEWAY_PERSONA_RESOLUTION = var.persona_resolution_mode
-        GAGENT_GATEWAY_ALLOWED_ORIGINS    = join(",", var.cors_allowed_origins)
-        LOG_LEVEL                         = var.log_level
+        GAGENT_AGENT_ID                    = var.agent_id
+        GAGENT_AGENT_ALIAS_ID              = var.agent_alias_id
+        GAGENT_DISPATCHER_ROLE_ARN         = var.persona_role_arns["dispatcher"]
+        GAGENT_TECHNICIAN_LEAD_ROLE_ARN    = var.persona_role_arns["technician_lead"]
+        GAGENT_OWNER_ROLE_ARN              = var.persona_role_arns["owner"]
+        GAGENT_LOG_GROUP                   = var.invocation_log_group
+        GAGENT_GATEWAY_PERSONA_RESOLUTION  = var.persona_resolution_mode
+        GAGENT_GATEWAY_ALLOWED_ORIGINS     = join(",", var.cors_allowed_origins)
+        GAGENT_GOVERNED_QUERY_LAMBDA_NAME  = var.governed_query_lambda_name
+        LOG_LEVEL                          = var.log_level
       },
       var.default_service_region != null ? {
         GAGENT_DEFAULT_SERVICE_REGION = var.default_service_region

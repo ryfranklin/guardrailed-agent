@@ -37,6 +37,24 @@ export interface AskResponse {
   session_id: string;
 }
 
+export interface PreviewRequest {
+  table: string;
+  persona: PersonaRole;
+  service_region?: string | null;
+  limit?: number;
+}
+
+export interface PreviewResponse {
+  table: string;
+  api_path: string;
+  template: string | null;
+  persona: PersonaRole;
+  service_region: string | null;
+  limit: number;
+  row_count: number;
+  rows: Array<Record<string, string | null>>;
+}
+
 export interface ApiErrorBody {
   error?: string;
   message?: string;

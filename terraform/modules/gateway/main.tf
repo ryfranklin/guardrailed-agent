@@ -81,6 +81,14 @@ resource "aws_apigatewayv2_route" "post_ask" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
+resource "aws_apigatewayv2_route" "post_preview" {
+  api_id             = aws_apigatewayv2_api.this.id
+  route_key          = "POST /preview"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
 resource "aws_cloudwatch_log_group" "access" {
   name              = local.access_log_group
   retention_in_days = var.log_retention_days

@@ -341,6 +341,9 @@ module "gateway" {
   agent_alias_id  = module.agent.agent_alias_id
   agent_alias_arn = module.agent.agent_alias_arn
 
+  governed_query_lambda_arn  = module.tools.lambda_arn
+  governed_query_lambda_name = module.tools.lambda_function_name
+
   persona_role_arns = {
     dispatcher      = module.identity.dispatcher_role_arn
     technician_lead = module.identity.technician_lead_role_arn

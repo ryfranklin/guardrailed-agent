@@ -32,8 +32,11 @@ import json
 import logging
 import os
 import socket
+import uuid
 from typing import Any
 
+import boto3
+from botocore.config import Config
 from botocore.exceptions import (
     ClientError,
     ConnectTimeoutError,
@@ -57,6 +60,23 @@ DEFAULT_CORS_ORIGINS: tuple[str, ...] = (
     "https://demo.ms3dm.tech",
     "http://localhost:5173",
 )
+
+# Static metadata for the data-preview view. Each entry maps a SPA-facing
+# table id to the apiPath the governed_query Lambda dispatches on. The SPA
+# also has its own copy of this list (for the table rail / column hints);
+# the Lambda's job is just to validate that the requested id is one of the
+# six the action group exposes.
+PREVIEW_API_PATHS: dict[str, str] = {
+    "customers": "/customers",
+    "jobs": "/jobs",
+    "signals": "/signals",
+    "equipment_telemetry": "/equipment_telemetry",
+    "technician_utilization": "/technician_utilization",
+    "truck_rolls": "/truck_rolls",
+}
+
+PREVIEW_DEFAULT_LIMIT = 10
+PREVIEW_MAX_LIMIT = 50
 
 THROTTLE_CODES: frozenset[str] = frozenset({
     "ThrottlingException",
@@ -185,63 +205,241 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         if claims is None:
             return _error(401, "unauthorized", "missing JWT claims.", response_origin)
 
-        body = _parse_body(event)
-        question, requested_role, requested_service_region = _validate_body(body)
-        surface = _resolve_surface(headers)
-
-        resolver = _build_resolver()
-        try:
-            persona = resolver.resolve(
-                claims=claims,
-                requested_role=requested_role,
-                requested_service_region=requested_service_region,
-            )
-        except PermissionError as exc:
-            logger.info("persona claim mismatch: %s", exc)
-            return _error(403, "persona_mismatch", str(exc), response_origin)
-        except (ValueError, KeyError) as exc:
-            logger.info("persona validation failed: %s", exc)
-            return _error(400, "invalid_persona", str(exc), response_origin)
-        except SsoMappingError as exc:
-            logger.info("claim-bound persona resolution failed: %s", exc)
-            return _error(400, "invalid_persona", str(exc), response_origin)
-
-        try:
-            response = invoke(
-                question,
-                persona,
-                agent_id=_required_env("GAGENT_AGENT_ID"),
-                agent_alias_id=_required_env("GAGENT_AGENT_ALIAS_ID"),
-                region=_required_env("AWS_REGION"),
-                surface=surface,
-                trace_name=f"gateway-{surface}",
-                log_group=os.environ.get("GAGENT_LOG_GROUP"),
-            )
-        except ClientError as exc:
-            return _map_client_error(exc, response_origin)
-        except (ReadTimeoutError, ConnectTimeoutError, socket.timeout) as exc:
-            logger.warning("bedrock invoke timeout: %s", exc)
-            return _error(
-                504, "upstream_timeout",
-                "Bedrock InvokeAgent timed out.", response_origin,
-            )
-
-        body = {
-            "text": response.text,
-            "persona": persona.role,
-            "service_region": persona.service_region,
-            "tools_called": list(response.trace_summary.tools_called),
-            "guardrail_blocks": response.trace_summary.guardrail_blocks,
-            "duration_seconds": round(response.duration_seconds, 3),
-            "session_id": response.session_id,
-        }
-        return _ok(200, body, response_origin)
-
+        route_key = (event.get("routeKey") or "").strip()
+        if route_key == "POST /preview":
+            return _handle_preview(event, claims, headers, response_origin)
+        return _handle_ask(event, claims, headers, response_origin)
     except _BadRequest as exc:
         return _error(400, exc.code, exc.message, response_origin)
     except Exception as exc:  # noqa: BLE001
         logger.exception("unhandled gateway error: %s", exc)
         return _error(500, "internal_error", "Internal error.", response_origin)
+
+
+def _handle_ask(
+    event: dict[str, Any],
+    claims: dict[str, Any],
+    headers: dict[str, str],
+    response_origin: str | None,
+) -> dict[str, Any]:
+    body = _parse_body(event)
+    question, requested_role, requested_service_region = _validate_body(body)
+    surface = _resolve_surface(headers)
+
+    persona = _resolve_persona_or_error(
+        claims, requested_role, requested_service_region, response_origin,
+    )
+    if isinstance(persona, dict):
+        return persona  # short-circuited error response
+
+    try:
+        response = invoke(
+            question,
+            persona,
+            agent_id=_required_env("GAGENT_AGENT_ID"),
+            agent_alias_id=_required_env("GAGENT_AGENT_ALIAS_ID"),
+            region=_required_env("AWS_REGION"),
+            surface=surface,
+            trace_name=f"gateway-{surface}",
+            log_group=os.environ.get("GAGENT_LOG_GROUP"),
+        )
+    except ClientError as exc:
+        return _map_client_error(exc, response_origin)
+    except (ReadTimeoutError, ConnectTimeoutError, socket.timeout) as exc:
+        logger.warning("bedrock invoke timeout: %s", exc)
+        return _error(
+            504, "upstream_timeout",
+            "Bedrock InvokeAgent timed out.", response_origin,
+        )
+
+    body_out = {
+        "text": response.text,
+        "persona": persona.role,
+        "service_region": persona.service_region,
+        "tools_called": list(response.trace_summary.tools_called),
+        "guardrail_blocks": response.trace_summary.guardrail_blocks,
+        "duration_seconds": round(response.duration_seconds, 3),
+        "session_id": response.session_id,
+    }
+    return _ok(200, body_out, response_origin)
+
+
+def _handle_preview(
+    event: dict[str, Any],
+    claims: dict[str, Any],
+    headers: dict[str, str],  # noqa: ARG001
+    response_origin: str | None,
+) -> dict[str, Any]:
+    body = _parse_body(event)
+    table = body.get("table")
+    if not isinstance(table, str) or table not in PREVIEW_API_PATHS:
+        raise _BadRequest(
+            "invalid_table",
+            f"'table' must be one of {sorted(PREVIEW_API_PATHS)}.",
+        )
+    api_path = PREVIEW_API_PATHS[table]
+
+    raw_limit = body.get("limit")
+    try:
+        limit = int(raw_limit) if raw_limit is not None else PREVIEW_DEFAULT_LIMIT
+    except (TypeError, ValueError) as exc:
+        raise _BadRequest("invalid_limit", "'limit' must be an integer.") from exc
+    limit = max(1, min(PREVIEW_MAX_LIMIT, limit))
+
+    requested_role = body.get("persona") or None
+    requested_service_region = body.get("service_region") or None
+    if requested_role is not None and not isinstance(requested_role, str):
+        raise _BadRequest("invalid_body", "'persona' must be a string when provided.")
+    if (
+        requested_service_region is not None
+        and not isinstance(requested_service_region, str)
+    ):
+        raise _BadRequest(
+            "invalid_body",
+            "'service_region' must be a string when provided.",
+        )
+
+    persona = _resolve_persona_or_error(
+        claims, requested_role, requested_service_region, response_origin,
+    )
+    if isinstance(persona, dict):
+        return persona
+
+    try:
+        rows, row_count, template_name = _invoke_governed_query(
+            persona=persona, api_path=api_path, limit=limit,
+        )
+    except ClientError as exc:
+        return _map_client_error(exc, response_origin)
+    except (ReadTimeoutError, ConnectTimeoutError, socket.timeout) as exc:
+        logger.warning("preview athena timeout: %s", exc)
+        return _error(
+            504, "upstream_timeout",
+            "Preview query timed out.", response_origin,
+        )
+
+    body_out = {
+        "table": table,
+        "api_path": api_path,
+        "template": template_name,
+        "persona": persona.role,
+        "service_region": persona.service_region,
+        "limit": limit,
+        "row_count": row_count,
+        "rows": rows,
+    }
+    return _ok(200, body_out, response_origin)
+
+
+def _resolve_persona_or_error(
+    claims: dict[str, Any],
+    requested_role: str | None,
+    requested_service_region: str | None,
+    response_origin: str | None,
+) -> Any:
+    """Returns a Persona on success, or an HTTP-error envelope on failure."""
+    resolver = _build_resolver()
+    try:
+        return resolver.resolve(
+            claims=claims,
+            requested_role=requested_role,
+            requested_service_region=requested_service_region,
+        )
+    except PermissionError as exc:
+        logger.info("persona claim mismatch: %s", exc)
+        return _error(403, "persona_mismatch", str(exc), response_origin)
+    except (ValueError, KeyError) as exc:
+        logger.info("persona validation failed: %s", exc)
+        return _error(400, "invalid_persona", str(exc), response_origin)
+    except SsoMappingError as exc:
+        logger.info("claim-bound persona resolution failed: %s", exc)
+        return _error(400, "invalid_persona", str(exc), response_origin)
+
+
+_lambda_client: Any = None
+
+
+def _get_lambda_client() -> Any:
+    global _lambda_client  # noqa: PLW0603
+    if _lambda_client is None:
+        _lambda_client = boto3.client(
+            "lambda",
+            config=Config(retries={"max_attempts": 2, "mode": "standard"}),
+        )
+    return _lambda_client
+
+
+def _invoke_governed_query(
+    *, persona: Any, api_path: str, limit: int,
+) -> tuple[list[dict[str, Any]], int, str | None]:
+    """Build a Bedrock action-group event and invoke the governed_query Lambda.
+
+    The governed_query Lambda runs Athena under the persona role; Lake
+    Formation enforces row + column visibility on the result set. Returning
+    the raw rows here is the whole point of /preview — the SPA shows the
+    same SQL producing different cells per persona.
+    """
+    function_name = _required_env("GAGENT_GOVERNED_QUERY_LAMBDA_NAME")
+
+    session_attrs: dict[str, str] = {"role": persona.role}
+    if persona.service_region:
+        session_attrs["service_region"] = persona.service_region
+
+    request_body_payload = {
+        "limit": limit,
+        "question_intent": "data preview",
+    }
+
+    invoke_event = {
+        "messageVersion": "1.0",
+        "actionGroup": "governed_query",
+        "apiPath": api_path,
+        "httpMethod": "POST",
+        "sessionId": f"preview-{persona.role}-{uuid.uuid4().hex[:6]}",
+        "sessionAttributes": session_attrs,
+        "promptSessionAttributes": {},
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "body": json.dumps(request_body_payload),
+                },
+            },
+        },
+    }
+
+    client = _get_lambda_client()
+    response = client.invoke(
+        FunctionName=function_name,
+        InvocationType="RequestResponse",
+        Payload=json.dumps(invoke_event).encode("utf-8"),
+    )
+    payload_bytes = response["Payload"].read()
+    if response.get("FunctionError"):
+        logger.error("governed_query unhandled error: %s", payload_bytes[:512])
+        raise RuntimeError("governed_query Lambda raised — see logs.")
+
+    payload = json.loads(payload_bytes)
+    inner = payload.get("response") or {}
+    status = inner.get("httpStatusCode")
+    response_body = (inner.get("responseBody") or {}).get("application/json", {})
+    raw = response_body.get("body") or "{}"
+    try:
+        decoded = json.loads(raw)
+    except json.JSONDecodeError:
+        decoded = {}
+
+    if status != 200:
+        msg = decoded.get("error") or "governed_query returned non-2xx."
+        raise _BadRequest("preview_failed", f"[{status}] {msg}")
+
+    rows = decoded.get("rows") or []
+    if not isinstance(rows, list):
+        rows = []
+    row_count = decoded.get("row_count")
+    if not isinstance(row_count, int):
+        row_count = len(rows)
+    template = decoded.get("template")
+    return rows, row_count, template if isinstance(template, str) else None
 
 
 def _map_client_error(exc: ClientError, response_origin: str | None) -> dict[str, Any]:

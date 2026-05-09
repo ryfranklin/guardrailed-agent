@@ -1,8 +1,17 @@
 import { fetchAuthSession } from "@aws-amplify/auth";
 
-import { ApiError, type AskRequest, type AskResponse } from "./types";
+import {
+  ApiError,
+  type AskRequest,
+  type AskResponse,
+  type PreviewRequest,
+  type PreviewResponse,
+} from "./types";
 
-export async function postAsk(input: AskRequest): Promise<AskResponse> {
+async function postJson<TBody, TResponse>(
+  path: string,
+  body: TBody,
+): Promise<TResponse> {
   const session = await fetchAuthSession();
   const token = session.tokens?.idToken?.toString();
   if (!token) throw new ApiError(401, "unauthenticated", "No active session.");
@@ -15,28 +24,38 @@ export async function postAsk(input: AskRequest): Promise<AskResponse> {
       "VITE_API_ENDPOINT is not set at build time.",
     );
 
-  const res = await fetch(`${endpoint}/ask`, {
+  const res = await fetch(`${endpoint}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(input),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
-    let body: { error?: string; message?: string } = {};
+    let errBody: { error?: string; message?: string } = {};
     try {
-      body = (await res.json()) as { error?: string; message?: string };
+      errBody = (await res.json()) as { error?: string; message?: string };
     } catch {
-      // Some error paths return non-JSON; fall through with empty body.
+      // non-JSON error body
     }
     throw new ApiError(
       res.status,
-      body.error ?? "unknown",
-      body.message ?? "",
+      errBody.error ?? "unknown",
+      errBody.message ?? "",
     );
   }
 
-  return (await res.json()) as AskResponse;
+  return (await res.json()) as TResponse;
+}
+
+export async function postAsk(input: AskRequest): Promise<AskResponse> {
+  return postJson<AskRequest, AskResponse>("/ask", input);
+}
+
+export async function postPreview(
+  input: PreviewRequest,
+): Promise<PreviewResponse> {
+  return postJson<PreviewRequest, PreviewResponse>("/preview", input);
 }
