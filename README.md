@@ -70,6 +70,7 @@ These scripts will exist after Phase 1. They are stubs today.
 | `scripts/deploy-demo.sh` | `terraform apply` against `terraform/envs/demo/` for the ms3dm.tech Demo account |
 | `scripts/seed-data.sh` | Run the synthetic data generator and register the four Iceberg tables in Glue |
 | `scripts/smoke-test.sh` | The demo moment — same prompt under Analyst vs Admin, asserting redacted vs full PII |
+| `scripts/smoke-web.sh` | Phase 3.a public-web-demo smoke test. Hits `POST /ask` under each persona with a fixed prompt; requires `SMOKE_TEST_JWT` (Cognito ID token) in the environment. See [docs/phase-3a-brief.md §14](docs/phase-3a-brief.md). |
 | `gra ask` | Headless CLI to invoke the Bedrock Agent under an assumed persona role with session tags (installed by `pip install -e .`) |
 
 Typical first-time deploy will look like:
