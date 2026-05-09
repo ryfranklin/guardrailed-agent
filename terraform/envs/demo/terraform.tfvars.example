@@ -45,3 +45,16 @@ foundation_model_id = "us.anthropic.claude-sonnet-4-6"
 # gateway_persona_resolution_mode  = "request-param"   # or "claim-bound" for client deployments
 # gateway_default_service_region   = "tempe-mesa"      # used only by claim-bound mode
 # gateway_rate_limit_per_5min      = 100
+
+# ---- ADR-013 §5.2 cost guardrails ----
+#
+# notification_email is REQUIRED. AWS sends a one-time confirmation email after
+# the first apply; the operator must click the confirm link before the warn /
+# hard-stop alarms can notify. See terraform/modules/cost-guardrails/README.md
+# for the full flow.
+
+notification_email = "ops@example.com"
+
+# Optional threshold overrides:
+# cost_alarm_warn_threshold_usd      = 50
+# cost_alarm_hard_stop_threshold_usd = 200

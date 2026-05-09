@@ -371,6 +371,16 @@ module "web_demo" {
   tags        = local.common_tags
 }
 
+module "cost_guardrails" {
+  source = "../../modules/cost-guardrails"
+
+  env                     = local.env
+  notification_email      = var.notification_email
+  warn_threshold_usd      = var.cost_alarm_warn_threshold_usd
+  hard_stop_threshold_usd = var.cost_alarm_hard_stop_threshold_usd
+  tags                    = local.common_tags
+}
+
 # SSM mirror of the values the §15 web.yml workflow consumes (bucket name +
 # distribution id) and the seven build-time VITE_* values the operator
 # copies into GitHub Actions repository vars before the first deploy.

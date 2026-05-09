@@ -82,6 +82,25 @@ variable "gateway_rate_limit_per_5min" {
   default     = 100
 }
 
+# ---- ADR-013 §5.2 cost guardrails ----
+
+variable "notification_email" {
+  description = "Operator email subscribed to the Bedrock cost-alarm SNS topic. Required: AWS sends a confirmation email after the first apply that the operator must click before alarms can notify."
+  type        = string
+}
+
+variable "cost_alarm_warn_threshold_usd" {
+  description = "USD/day threshold for the warn-tier Bedrock cost alarm. ADR-013 §5.2 default 50."
+  type        = number
+  default     = 50
+}
+
+variable "cost_alarm_hard_stop_threshold_usd" {
+  description = "USD/day threshold for the hard-stop-tier Bedrock cost alarm. ADR-013 §5.2 default 200; ALARM transition triggers the runbook's immediate-containment path."
+  type        = number
+  default     = 200
+}
+
 variable "google_client_id" {
   description = "Google OAuth client ID for Cognito federation. Pass via TF_VAR_google_client_id; never commit."
   type        = string

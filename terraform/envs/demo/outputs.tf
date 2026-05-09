@@ -124,3 +124,8 @@ output "phase_3a_ssm_parameter_names" {
   description = "Sorted list of SSM parameter names under /gagent/<env>/ that the §15 CI workflow and the operator consume."
   value       = sort([for k, _ in local.phase_3a_ssm_params : "/gagent/${local.env}/${k}"])
 }
+
+output "cost_alarm_sns_topic_arn" {
+  description = "SNS topic ARN that fans out the ADR-013 §5.2 Bedrock cost-alarm transitions. Subscribe additional endpoints (Slack, PagerDuty) here for richer notification."
+  value       = module.cost_guardrails.sns_topic_arn
+}
