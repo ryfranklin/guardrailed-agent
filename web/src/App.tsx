@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { AskResponse } from "./api/types";
 import { ChatView } from "./components/ChatView";
@@ -6,14 +6,29 @@ import { DataView } from "./components/DataView";
 import { FlowView } from "./components/FlowView";
 import { PersonaModal } from "./components/PersonaModal";
 import { usePersona } from "./state/persona";
+import { useDeveloperMode } from "./state/developerMode";
 
 type Tab = "chat" | "data" | "flow";
 
 export function App() {
   const persona = usePersona();
+  const { enabled: developerMode } = useDeveloperMode();
   const [picking, setPicking] = useState(true);
   const [tab, setTab] = useState<Tab>("chat");
   const [lastResponse, setLastResponse] = useState<AskResponse | null>(null);
+
+  // Snap back to Chat if the user toggles developer mode off while parked
+  // on the Flow tab (which is otherwise hidden).
+  useEffect(() => {
+    if (!developerMode && tab === "flow") setTab("chat");
+  }, [developerMode, tab]);
+
+  // Drop any captured response when developer mode goes off so we don't
+  // hold response state nobody is watching, and so flipping back on
+  // doesn't show stale data from a previous session.
+  useEffect(() => {
+    if (!developerMode && lastResponse !== null) setLastResponse(null);
+  }, [developerMode, lastResponse]);
 
   if (picking || !persona.isReady || persona.role === null) {
     return (
@@ -54,9 +69,11 @@ export function App() {
         <TabButton active={tab === "data"} onClick={() => setTab("data")}>
           Data
         </TabButton>
-        <TabButton active={tab === "flow"} onClick={() => setTab("flow")}>
-          Flow
-        </TabButton>
+        {developerMode && (
+          <TabButton active={tab === "flow"} onClick={() => setTab("flow")}>
+            Flow
+          </TabButton>
+        )}
       </nav>
       <div className="flex-1 overflow-hidden">
         {tab === "chat" && (
@@ -65,7 +82,7 @@ export function App() {
             role={persona.role}
             serviceRegion={persona.serviceRegion}
             onChangePersona={onChangePersona}
-            onResponse={setLastResponse}
+            onResponse={developerMode ? setLastResponse : undefined}
           />
         )}
         {tab === "data" && (
@@ -76,7 +93,7 @@ export function App() {
             onChangePersona={onChangePersona}
           />
         )}
-        {tab === "flow" && (
+        {tab === "flow" && developerMode && (
           <FlowView
             key={personaKey}
             role={persona.role}

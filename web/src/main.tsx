@@ -5,6 +5,7 @@ import { BrowserRouter } from "react-router-dom";
 import "./styles/globals.css";
 import { AppRoutes } from "./routes";
 import { configureAmplify } from "./auth/amplifyConfig";
+import { DeveloperModeProvider } from "./state/developerMode";
 
 configureAmplify();
 
@@ -15,8 +16,10 @@ if (!container) {
 
 createRoot(container).render(
   <StrictMode>
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
+    <DeveloperModeProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </DeveloperModeProvider>
   </StrictMode>,
 );

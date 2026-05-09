@@ -5,6 +5,8 @@ import {
   signOut,
 } from "@aws-amplify/auth";
 
+import { useDeveloperMode } from "../state/developerMode";
+
 interface AuthGateProps {
   children: ReactNode;
 }
@@ -14,6 +16,8 @@ type AuthStatus = "checking" | "authenticated" | "redirecting";
 export function AuthGate({ children }: AuthGateProps) {
   const [status, setStatus] = useState<AuthStatus>("checking");
   const [email, setEmail] = useState<string | null>(null);
+  const { enabled: developerMode, setEnabled: setDeveloperMode } =
+    useDeveloperMode();
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +67,18 @@ export function AuthGate({ children }: AuthGateProps) {
         </div>
         <div className="flex items-center gap-4 text-sm text-slate-600">
           {email && <span data-testid="auth-email">{email}</span>}
+          <label
+            className="flex cursor-pointer items-center gap-2 text-xs text-slate-600"
+            data-testid="developer-toggle"
+          >
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+              checked={developerMode}
+              onChange={(e) => setDeveloperMode(e.target.checked)}
+            />
+            Developer
+          </label>
           <button
             type="button"
             className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-100"
