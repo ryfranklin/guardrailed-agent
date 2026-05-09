@@ -5,11 +5,17 @@ on:
   pull_request:
     paths:
       - "terraform/**"
+      - "lambdas/governed_query/**"
+      - "lambdas/gateway/**"
+      - "gagent_client/**"
       - ".github/workflows/terraform.yml"
   push:
     branches: [main]
     paths:
       - "terraform/**"
+      - "lambdas/governed_query/**"
+      - "lambdas/gateway/**"
+      - "gagent_client/**"
       - ".github/workflows/terraform.yml"
 
 permissions:
