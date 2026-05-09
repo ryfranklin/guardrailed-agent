@@ -1,6 +1,6 @@
-"""Persona resolution for the guardrailed-agent client (ADR-006, ADR-009).
+"""Persona resolution for the guardrailed-agent client (ADR-006, ADR-007, ADR-009).
 
-Two deployment shapes:
+Three resolvers, sharing the Persona dataclass and VALID_ROLES:
 
   Shape A — FlagPersonaResolver
     Caller passes the persona role name; resolver looks up the IAM ARN.
@@ -15,6 +15,18 @@ Two deployment shapes:
     Per-call ``--persona`` overrides are no-ops with a WARN log — the
     persona is bound to the developer's SSO identity, not the caller's
     request. This is the team-adoption path per ADR-009.
+
+  Cognito — CognitoPersonaResolver (ADR-007)
+    For Cognito-authenticated callers behind an API Gateway JWT authorizer.
+    Two modes:
+      ``request-param`` — Shape A flavor. Persona supplied per-call
+      from the request body; JWT only authenticates. Used for the public
+      web demo (synthetic data makes per-session persona selection safe).
+      ``claim-bound`` — Shape B flavor. Persona taken from the
+      ``custom:persona`` claim. Body-supplied persona that disagrees with
+      the claim is rejected (caller lied about persona).
+    JWT validation is the API Gateway authorizer's job upstream — this
+    resolver accepts an already-decoded claims dict.
 """
 
 from __future__ import annotations
@@ -314,6 +326,173 @@ class SsoPersonaResolver:
     @property
     def resolved_persona(self) -> Persona:
         return self._resolved_persona
+
+
+# ---- Cognito (ADR-007) ----
+
+VALID_COGNITO_MODES: tuple[str, ...] = ("request-param", "claim-bound")
+DEFAULT_COGNITO_MODE = "request-param"
+COGNITO_MODE_ENV_VAR = "GAGENT_GATEWAY_PERSONA_RESOLUTION"
+DEFAULT_SERVICE_REGION_ENV_VAR = "GAGENT_DEFAULT_SERVICE_REGION"
+COGNITO_PERSONA_CLAIM = "custom:persona"
+
+
+class CognitoPersonaResolver:
+    """ADR-007 — persona resolution for Cognito-authenticated callers.
+
+    The API Gateway HTTP API JWT authorizer validates and decodes the
+    Cognito ID token upstream; this resolver is given the already-decoded
+    claims dict.
+
+    Mode selection (request-param vs claim-bound) is fixed at construction
+    via the ``mode`` argument; if omitted, the value of
+    ``GAGENT_GATEWAY_PERSONA_RESOLUTION`` is used, defaulting to
+    ``request-param`` (the public-demo mode).
+
+    This resolver does NOT satisfy the ``PersonaResolver`` Protocol used by
+    Flag/Sso — its ``resolve()`` signature takes ``claims=`` and
+    ``requested_role=`` rather than a positional ``role`` because the
+    information sources are different. Callers (the gateway Lambda) hold
+    a concrete ``CognitoPersonaResolver`` reference rather than a
+    Protocol-typed one.
+    """
+
+    def __init__(
+        self,
+        role_arns: Mapping[str, str],
+        *,
+        mode: str | None = None,
+        env: Mapping[str, str] | None = None,
+    ):
+        unknown = [r for r in role_arns if r not in VALID_ROLES]
+        if unknown:
+            raise ValueError(
+                f"unknown role(s) in role_arns mapping: {unknown}; "
+                f"valid: {list(VALID_ROLES)}",
+            )
+        self._role_arns: dict[str, str] = dict(role_arns)
+        self._env: dict[str, str] = dict(env) if env is not None else dict(os.environ)
+
+        chosen = mode if mode is not None else self._env.get(
+            COGNITO_MODE_ENV_VAR, DEFAULT_COGNITO_MODE,
+        )
+        if chosen not in VALID_COGNITO_MODES:
+            raise ValueError(
+                f"mode must be one of {VALID_COGNITO_MODES}; got {chosen!r}. "
+                f"Set the {COGNITO_MODE_ENV_VAR} env var or pass mode= "
+                "explicitly.",
+            )
+        self._mode: str = chosen
+
+    @property
+    def mode(self) -> str:
+        return self._mode
+
+    def known_roles(self) -> list[str]:
+        return sorted(self._role_arns)
+
+    def resolve(
+        self,
+        *,
+        claims: dict[str, Any],
+        requested_role: str | None = None,
+        requested_service_region: str | None = None,
+    ) -> Persona:
+        if self._mode == "request-param":
+            return self._resolve_request_param(
+                requested_role=requested_role,
+                requested_service_region=requested_service_region,
+            )
+        return self._resolve_claim_bound(
+            claims=claims,
+            requested_role=requested_role,
+            requested_service_region=requested_service_region,
+        )
+
+    def _resolve_request_param(
+        self,
+        *,
+        requested_role: str | None,
+        requested_service_region: str | None,
+    ) -> Persona:
+        if not requested_role:
+            raise ValueError(
+                "request-param mode requires 'persona' in the request body. "
+                "Got requested_role=None.",
+            )
+        if requested_role not in VALID_ROLES:
+            raise ValueError(
+                f"invalid persona {requested_role!r}; "
+                f"valid: {list(VALID_ROLES)}",
+            )
+        if requested_role == "technician_lead" and not requested_service_region:
+            raise ValueError(
+                "technician_lead persona requires a 'service_region' in "
+                "the request body.",
+            )
+        return self._build_persona(
+            role=requested_role,
+            service_region=requested_service_region,
+        )
+
+    def _resolve_claim_bound(
+        self,
+        *,
+        claims: dict[str, Any],
+        requested_role: str | None,
+        requested_service_region: str | None,
+    ) -> Persona:
+        claim_persona = claims.get(COGNITO_PERSONA_CLAIM)
+        if not claim_persona:
+            raise SsoMappingError(
+                f"claim-bound mode: caller's JWT has no {COGNITO_PERSONA_CLAIM} "
+                "claim. Populate the Cognito custom:persona attribute or "
+                "switch to request-param mode.",
+            )
+        if claim_persona not in VALID_ROLES:
+            raise SsoMappingError(
+                f"claim-bound mode: {COGNITO_PERSONA_CLAIM}={claim_persona!r} "
+                f"is not a valid persona; valid: {list(VALID_ROLES)}.",
+            )
+        if requested_role and requested_role != claim_persona:
+            raise PermissionError(
+                f"claim-bound mode: requested persona {requested_role!r} "
+                f"does not match JWT claim {claim_persona!r}.",
+            )
+        service_region: str | None = None
+        if claim_persona == "technician_lead":
+            service_region = (
+                requested_service_region
+                or self._env.get(DEFAULT_SERVICE_REGION_ENV_VAR)
+            )
+            if not service_region:
+                raise SsoMappingError(
+                    "claim-bound mode: technician_lead persona requires a "
+                    "service_region (request body or "
+                    f"{DEFAULT_SERVICE_REGION_ENV_VAR} env var).",
+                )
+        return self._build_persona(
+            role=claim_persona, service_region=service_region,
+        )
+
+    def _build_persona(
+        self, *, role: str, service_region: str | None,
+    ) -> Persona:
+        if role not in self._role_arns:
+            raise KeyError(
+                f"no role ARN configured for {role!r}; "
+                f"have {sorted(self._role_arns)}",
+            )
+        # Persona's __post_init__ rejects service_region for non-tech-lead;
+        # null it out here so the dataclass accepts dispatcher/owner regardless
+        # of what the body sent.
+        if role != "technician_lead":
+            service_region = None
+        return Persona(
+            role=role,
+            role_arn=self._role_arns[role],
+            service_region=service_region,
+        )
 
 
 def _load_mapping_file(path: Path) -> dict[str, Any]:

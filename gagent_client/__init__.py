@@ -12,10 +12,13 @@ Public API:
   emit_invocation_log(...)                   structured trace emission
   Persona, InvocationResponse, TraceSummary  result types
   FlagPersonaResolver, SsoPersonaResolver    Shape A / Shape B resolvers
+  CognitoPersonaResolver                     Cognito-authenticated callers (ADR-007)
 """
 
 from .identity import (
+    VALID_COGNITO_MODES,
     VALID_ROLES,
+    CognitoPersonaResolver,
     FlagPersonaResolver,
     Persona,
     PersonaResolver,
@@ -39,12 +42,14 @@ from .trace import (
 __all__ = [
     "DEFAULT_DURATION_SECONDS",
     "DEFAULT_LOG_GROUP",
+    "CognitoPersonaResolver",
     "FlagPersonaResolver",
     "InvocationResponse",
     "Persona",
     "PersonaResolver",
     "SsoPersonaResolver",
     "TraceSummary",
+    "VALID_COGNITO_MODES",
     "VALID_ROLES",
     "assume_persona",
     "emit_invocation_log",
