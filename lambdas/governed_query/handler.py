@@ -232,10 +232,11 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         persona = _resolve_persona(event)
         template = _resolve_template(event)
         body = _parse_request_body(event, template, persona)
-        rows = _run_query(persona, template, body)
+        rows, columns = _run_query(persona, template, body)
         return _agent_response(event, 200, {
             "rows": rows,
             "row_count": len(rows),
+            "columns": columns,
             "template": template.name,
             "persona": persona.role,
             "question_intent": body.get("question_intent") or "",
@@ -334,6 +335,13 @@ def _parse_request_body(
                 f"got {persona.role!r}."
             )
 
+    # `preview` is the data-preview mode used by the gateway Lambda's
+    # /preview path. It selects * instead of an explicit column list so
+    # Lake Formation transparently filters down to the columns the persona
+    # can see — turning column-level deny (the agent path retries) into a
+    # missing-column UX (the preview path renders whatever LF returns).
+    preview = bool(raw.get("preview"))
+
     filters_raw = raw.get("filters") or {}
     if not isinstance(filters_raw, dict):
         raise BadRequest("filters must be an object of column->value pairs.")
@@ -357,6 +365,7 @@ def _parse_request_body(
         "include_deleted": include_deleted,
         "eq_filters": eq_filters,
         "range_filters": range_filters,
+        "preview": preview,
     }
 
 
@@ -444,7 +453,7 @@ def build_query(template: TemplateSpec, parsed: dict[str, Any]) -> tuple[str, li
         where_parts.append(f"{col} {op} ?")
         params.append(fval)
 
-    cols = ", ".join(template.columns)
+    cols = "*" if parsed.get("preview") else ", ".join(template.columns)
     where = " WHERE " + " AND ".join(where_parts) if where_parts else ""
     sql = f"SELECT {cols} FROM {template.table}{where} LIMIT {parsed['limit']}"
     return sql, params
@@ -454,7 +463,7 @@ def _run_query(
     persona: PersonaContext,
     template: TemplateSpec,
     parsed: dict[str, Any],
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], list[str]]:
     creds = _assume_persona(persona)
     athena = boto3.client(
         "athena",
@@ -519,7 +528,9 @@ def _wait_for_query(athena, execution_id: str, max_seconds: int = 50) -> None:
     raise TimeoutError(f"Athena query {execution_id} did not complete in {max_seconds}s.")
 
 
-def _fetch_results(athena, execution_id: str) -> list[dict[str, Any]]:
+def _fetch_results(
+    athena, execution_id: str,
+) -> tuple[list[dict[str, Any]], list[str]]:
     paginator = athena.get_paginator("get_query_results")
     rows: list[dict[str, Any]] = []
     columns: list[str] = []
@@ -536,7 +547,7 @@ def _fetch_results(athena, execution_id: str) -> list[dict[str, Any]]:
         for row in page_rows:
             values = [cell.get("VarCharValue") for cell in row["Data"]]
             rows.append(dict(zip(columns, values, strict=True)))
-    return rows
+    return rows, columns
 
 
 def _agent_response(event: dict[str, Any], status: int, body: dict[str, Any]) -> dict[str, Any]:

@@ -53,6 +53,7 @@ export interface PreviewResponse {
   limit: number;
   row_count: number;
   rows: Array<Record<string, string | null>>;
+  columns: string[];
 }
 
 export interface ApiErrorBody {

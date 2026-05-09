@@ -306,7 +306,7 @@ def _handle_preview(
         return persona
 
     try:
-        rows, row_count, template_name = _invoke_governed_query(
+        rows, row_count, template_name, returned_columns = _invoke_governed_query(
             persona=persona, api_path=api_path, limit=limit,
         )
     except ClientError as exc:
@@ -327,6 +327,7 @@ def _handle_preview(
         "limit": limit,
         "row_count": row_count,
         "rows": rows,
+        "columns": returned_columns,
     }
     return _ok(200, body_out, response_origin)
 
@@ -371,7 +372,7 @@ def _get_lambda_client() -> Any:
 
 def _invoke_governed_query(
     *, persona: Any, api_path: str, limit: int,
-) -> tuple[list[dict[str, Any]], int, str | None]:
+) -> tuple[list[dict[str, Any]], int, str | None, list[str]]:
     """Build a Bedrock action-group event and invoke the governed_query Lambda.
 
     The governed_query Lambda runs Athena under the persona role; Lake
@@ -388,6 +389,11 @@ def _invoke_governed_query(
     request_body_payload = {
         "limit": limit,
         "question_intent": "data preview",
+        # `preview` flips governed_query to SELECT * so Lake Formation
+        # transparently filters down to the columns the persona can see —
+        # avoiding the COLUMN_NOT_FOUND 403 that explicit column SELECT
+        # would hit for personas without access to PII columns.
+        "preview": True,
     }
 
     invoke_event = {
@@ -439,7 +445,15 @@ def _invoke_governed_query(
     if not isinstance(row_count, int):
         row_count = len(rows)
     template = decoded.get("template")
-    return rows, row_count, template if isinstance(template, str) else None
+    columns = decoded.get("columns") or []
+    if not isinstance(columns, list):
+        columns = []
+    return (
+        rows,
+        row_count,
+        template if isinstance(template, str) else None,
+        [str(c) for c in columns],
+    )
 
 
 def _map_client_error(exc: ClientError, response_origin: str | None) -> dict[str, Any]:

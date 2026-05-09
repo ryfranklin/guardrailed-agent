@@ -82,6 +82,8 @@ export function DataView({
 
   const rows = currentResponse?.rows ?? [];
   const columns = selectedTable.columns;
+  const visibleColumns = currentResponse?.columns ?? [];
+  const hiddenByLf = columns.filter((c) => !visibleColumns.includes(c));
 
   return (
     <section className="flex h-full flex-col" data-testid="data-view">
@@ -168,6 +170,17 @@ export function DataView({
                 </span>
                 {serviceRegion ? ` (${serviceRegion})` : ""}.
               </p>
+              {hiddenByLf.length > 0 && (
+                <p
+                  className="mt-1 text-xs text-rose-700"
+                  data-testid="lf-denied-summary"
+                >
+                  <span className="font-semibold">Lake Formation blocked</span>{" "}
+                  {hiddenByLf.length} column
+                  {hiddenByLf.length === 1 ? "" : "s"} for this persona:{" "}
+                  <span className="font-mono">{hiddenByLf.join(", ")}</span>
+                </p>
+              )}
             </div>
 
             <div className="flex-1 overflow-auto px-6 py-4">
@@ -232,9 +245,21 @@ export function DataView({
                       {rows.map((r, i) => (
                         <tr key={i} className="hover:bg-slate-50">
                           {columns.map((c) => {
+                            const lfDenied = !visibleColumns.includes(c);
                             const value = r[c];
                             const isRedacted = value === "REDACTED";
                             const isNull = value === null || value === undefined;
+                            if (lfDenied) {
+                              return (
+                                <td
+                                  key={c}
+                                  className="whitespace-nowrap px-3 py-2 align-top font-mono text-xs bg-rose-100 text-rose-800"
+                                  title="Lake Formation denied SELECT on this column for the active persona."
+                                >
+                                  🔒 LF
+                                </td>
+                              );
+                            }
                             return (
                               <td
                                 key={c}
