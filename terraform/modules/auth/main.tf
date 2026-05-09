@@ -18,7 +18,7 @@ locals {
   github_provider    = "GitHub"
   slack_provider     = "Slack"
   cognito_provider   = "COGNITO"
-  identity_providers = [local.cognito_provider, local.google_provider, local.github_provider, local.slack_provider]
+  identity_providers = [local.cognito_provider, local.google_provider, local.slack_provider]
 }
 
 resource "aws_cognito_user_pool" "this" {
@@ -92,33 +92,15 @@ resource "aws_cognito_identity_provider" "google" {
   }
 }
 
-# GitHub does not natively expose OIDC discovery or JWKS. Cognito's generic OIDC
-# provider wraps GitHub's OAuth 2.0 endpoints; the user-info response is fetched
-# via GET and manually mapped. The `openid` scope is included to satisfy Cognito's
-# generic OIDC requirement even though GitHub ignores it.
-resource "aws_cognito_identity_provider" "github" {
-  user_pool_id  = aws_cognito_user_pool.this.id
-  provider_name = local.github_provider
-  provider_type = "OIDC"
-
-  provider_details = {
-    client_id                     = var.github_client_id
-    client_secret                 = var.github_client_secret
-    authorize_scopes              = "openid read:user user:email"
-    attributes_request_method     = "GET"
-    oidc_issuer                   = "https://github.com"
-    authorize_url                 = "https://github.com/login/oauth/authorize"
-    token_url                     = "https://github.com/login/oauth/access_token"
-    attributes_url                = "https://api.github.com/user"
-    attributes_url_add_attributes = "false"
-  }
-
-  attribute_mapping = {
-    email    = "email"
-    username = "id"
-    name     = "name"
-  }
-}
+# GitHub-as-OIDC deferred to Phase 3.5. Cognito's generic-OIDC provider rejects
+# the username attribute mapping with "id cannot be mapped to username" because
+# GitHub does not expose a `sub` claim — the only field Cognito will accept as
+# the username source. The brief (§7.4) explicitly allows simplifying to
+# Google + email/password for v1 launch when GitHub-as-OIDC is brittle. The
+# github_client_id / github_client_secret variables remain declared so adding
+# the resource back in Phase 3.5 is a code-only change.
+#
+# resource "aws_cognito_identity_provider" "github" { ... }
 
 resource "aws_cognito_identity_provider" "slack" {
   user_pool_id  = aws_cognito_user_pool.this.id
@@ -181,7 +163,6 @@ resource "aws_cognito_user_pool_client" "web" {
 
   depends_on = [
     aws_cognito_identity_provider.google,
-    aws_cognito_identity_provider.github,
     aws_cognito_identity_provider.slack,
   ]
 }

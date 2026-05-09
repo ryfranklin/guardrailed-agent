@@ -4,7 +4,7 @@ locals {
 
 resource "aws_wafv2_web_acl" "this" {
   name        = local.waf_name
-  description = "Web ACL for the public-demo gateway HTTP API. Common + KnownBadInputs managed rules + per-IP rate limit (ADR-010 §5)."
+  description = "Web ACL for the public-demo gateway HTTP API. Common + KnownBadInputs managed rules + per-IP rate limit per ADR-010."
   scope       = "REGIONAL"
 
   default_action {
@@ -86,7 +86,21 @@ resource "aws_wafv2_web_acl" "this" {
   tags = var.tags
 }
 
-resource "aws_wafv2_web_acl_association" "stage" {
-  resource_arn = aws_apigatewayv2_stage.default.arn
-  web_acl_arn  = aws_wafv2_web_acl.this.arn
-}
+# aws_wafv2_web_acl_association deferred to Phase 3.5.
+#
+# AWS WAFv2 supports REST API (v1) stages, ALB, AppSync, CloudFront, Cognito,
+# AppRunner, and Amplify — but NOT API Gateway HTTP API (v2) stages. The
+# AssociateWebACL call returns WAFInvalidParameterException for HTTP API
+# stage ARNs. The brief's §10 spec assumed support; it doesn't exist.
+#
+# The WAF ACL above is created with the three rules per ADR-010 §5 and is
+# observable via CloudWatch metrics, but it is NOT enforcing on the HTTP API
+# until one of these unblocks the association in 3.5:
+#   1. AWS adds HTTP API v2 to the WAFv2 supported-resource set.
+#   2. Migrate the gateway from HTTP API → REST API.
+#   3. Front the HTTP API with CloudFront and attach WAF to that.
+#
+# resource "aws_wafv2_web_acl_association" "stage" {
+#   resource_arn = aws_apigatewayv2_stage.default.arn
+#   web_acl_arn  = aws_wafv2_web_acl.this.arn
+# }
