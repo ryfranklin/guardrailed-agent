@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { postAsk } from "../api/client";
 import { ApiError, type PersonaRole } from "../api/types";
@@ -11,12 +11,21 @@ import {
 import { ComposerInput } from "./ComposerInput";
 import { ErrorBanner } from "./ErrorBanner";
 import { PersonaIndicator } from "./PersonaIndicator";
+import { Spinner } from "./Spinner";
 
 interface ChatViewProps {
   role: PersonaRole;
   serviceRegion: string | null;
   onChangePersona: () => void;
 }
+
+// A minimal prompt the agent can answer in one model turn with no tool
+// calls. Warms the gateway Lambda, STS for the chosen persona, the Bedrock
+// runtime client connection, and the agent's foundation-model invocation
+// path so the user's first real query lands inside the API Gateway's 30s
+// integration timeout.
+const WARMUP_PROMPT =
+  "Briefly describe your role in one sentence. Do not call any tools.";
 
 let messageCounter = 0;
 function nextMessageId(): string {
@@ -59,6 +68,36 @@ export function ChatView({
   const [pending, setPending] = useState(false);
   const [pendingStartedAt, setPendingStartedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warmupState, setWarmupState] = useState<"warming" | "ready">(
+    "warming",
+  );
+  const [warmupStartedAt, setWarmupStartedAt] = useState<number>(() =>
+    Date.now(),
+  );
+
+  // Pre-warm the agent path so the first real query doesn't pay the cold-
+  // start tax. Fires once per ChatView mount; ChatView remounts on persona
+  // change via its `key` prop, so this runs again per persona switch.
+  useEffect(() => {
+    let cancelled = false;
+    setWarmupState("warming");
+    setWarmupStartedAt(Date.now());
+    postAsk({
+      question: WARMUP_PROMPT,
+      persona: role,
+      service_region: serviceRegion,
+    })
+      .catch(() => {
+        // Warmup failures are silent — the user can still try real queries
+        // (the cold start has been paid for at this point regardless).
+      })
+      .finally(() => {
+        if (!cancelled) setWarmupState("ready");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [role, serviceRegion]);
 
   const submit = useCallback(
     async (text: string) => {
@@ -116,6 +155,19 @@ export function ChatView({
         />
         <span className="text-xs text-slate-400">session {sessionId}</span>
       </div>
+      {warmupState === "warming" && (
+        <div
+          className="border-b border-sky-200 bg-sky-50 px-6 py-3 text-sm text-sky-900"
+          data-testid="warmup-banner"
+        >
+          <Spinner startedAt={warmupStartedAt} />
+          <p className="mt-1 text-xs text-sky-800">
+            Pre-warming the agent for{" "}
+            <span className="font-medium">{role}</span> so your first query
+            lands inside the 30s gateway window.
+          </p>
+        </div>
+      )}
       {error && (
         <ErrorBanner message={error} onDismiss={() => setError(null)} />
       )}
@@ -124,7 +176,10 @@ export function ChatView({
         pending={pending}
         pendingStartedAt={pendingStartedAt}
       />
-      <ComposerInput disabled={pending} onSubmit={submit} />
+      <ComposerInput
+        disabled={pending || warmupState === "warming"}
+        onSubmit={submit}
+      />
     </section>
   );
 }
