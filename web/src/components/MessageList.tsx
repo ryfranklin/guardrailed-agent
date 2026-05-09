@@ -2,6 +2,8 @@ import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { Spinner } from "./Spinner";
+
 export type MessageRole = "user" | "assistant";
 
 export interface ChatMessage {
@@ -16,9 +18,14 @@ export interface ChatMessage {
 interface MessageListProps {
   messages: ChatMessage[];
   pending: boolean;
+  pendingStartedAt: number | null;
 }
 
-export function MessageList({ messages, pending }: MessageListProps) {
+export function MessageList({
+  messages,
+  pending,
+  pendingStartedAt,
+}: MessageListProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -77,10 +84,10 @@ export function MessageList({ messages, pending }: MessageListProps) {
         ))}
         {pending && (
           <li
-            className="mr-auto max-w-2xl rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500"
+            className="mr-auto max-w-2xl rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm"
             data-testid="message-pending"
           >
-            <span className="inline-block animate-pulse">Thinking…</span>
+            <Spinner startedAt={pendingStartedAt ?? Date.now()} />
           </li>
         )}
       </ul>

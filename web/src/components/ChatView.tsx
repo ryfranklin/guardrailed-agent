@@ -57,6 +57,7 @@ export function ChatView({
   const sessionId = useSession();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pending, setPending] = useState(false);
+  const [pendingStartedAt, setPendingStartedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const submit = useCallback(
@@ -68,6 +69,7 @@ export function ChatView({
       };
       setMessages((prev) => [...prev, userMessage]);
       setPending(true);
+      setPendingStartedAt(Date.now());
       setError(null);
       try {
         const response = await postAsk({
@@ -94,6 +96,7 @@ export function ChatView({
         }
       } finally {
         setPending(false);
+        setPendingStartedAt(null);
       }
     },
     [role, serviceRegion],
@@ -116,7 +119,11 @@ export function ChatView({
       {error && (
         <ErrorBanner message={error} onDismiss={() => setError(null)} />
       )}
-      <MessageList messages={messages} pending={pending} />
+      <MessageList
+        messages={messages}
+        pending={pending}
+        pendingStartedAt={pendingStartedAt}
+      />
       <ComposerInput disabled={pending} onSubmit={submit} />
     </section>
   );
