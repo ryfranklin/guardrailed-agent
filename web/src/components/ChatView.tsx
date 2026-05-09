@@ -24,6 +24,31 @@ function nextMessageId(): string {
   return `msg-${messageCounter}-${Date.now().toString(36)}`;
 }
 
+function formatApiError(err: ApiError): string {
+  if (err.status === 504 || (err.status === 503 && !err.detail)) {
+    return (
+      "Request timed out (>30s). The agent is still running but API Gateway " +
+      "gave up at its 30-second integration timeout. Streaming responses " +
+      "land in Phase 3.5. Try a simpler question (e.g. 'Show me one " +
+      "customer in service_region tempe-mesa') so the turn completes within " +
+      "the window."
+    );
+  }
+  if (err.status === 502 || err.status === 503) {
+    return `Gateway error (${err.status}): ${err.detail || "no detail"}.`;
+  }
+  if (err.status === 401) {
+    return "Session expired. Refresh the page to sign in again.";
+  }
+  if (err.status === 403) {
+    return `Access denied: ${err.detail || "no detail"}.`;
+  }
+  if (err.status === 429) {
+    return "Rate-limited by the gateway. Wait 30 seconds and try again.";
+  }
+  return `${err.code}: ${err.detail || "(no detail)"} [${err.status}]`;
+}
+
 export function ChatView({
   role,
   serviceRegion,
@@ -61,9 +86,9 @@ export function ChatView({
         setMessages((prev) => [...prev, assistantMessage]);
       } catch (err) {
         if (err instanceof ApiError) {
-          setError(`${err.code}: ${err.detail || "(no detail)"}`);
+          setError(formatApiError(err));
         } else if (err instanceof Error) {
-          setError(err.message);
+          setError(`Couldn't reach the gateway: ${err.message}`);
         } else {
           setError("Unknown error.");
         }
