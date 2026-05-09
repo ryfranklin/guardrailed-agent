@@ -23,3 +23,25 @@ foundation_model_id = "us.anthropic.claude-sonnet-4-6"
 # tags = {
 #   CostCenter = "ms3dm-flagship"
 # }
+
+# ---- Phase 3.a — public web demo ----
+#
+# The auth module needs OAuth credentials for each federated IdP. Create the
+# OAuth apps on Google / GitHub / Slack first, set callback URL on each side
+# to https://${web_domain_name}/auth/callback (and http://localhost:5173/...
+# for local dev), then either fill these in here or pass via TF_VAR_<name>.
+#
+# terraform.tfvars is gitignored — these are sensitive.
+
+# google_client_id     = "REPLACE.apps.googleusercontent.com"
+# google_client_secret = "REPLACE"
+# github_client_id     = "REPLACE"
+# github_client_secret = "REPLACE"
+# slack_client_id      = "REPLACE"
+# slack_client_secret  = "REPLACE"
+
+# Optional overrides:
+# web_domain_name                  = "demo.ms3dm.tech"
+# gateway_persona_resolution_mode  = "request-param"   # or "claim-bound" for client deployments
+# gateway_default_service_region   = "tempe-mesa"      # used only by claim-bound mode
+# gateway_rate_limit_per_5min      = 100

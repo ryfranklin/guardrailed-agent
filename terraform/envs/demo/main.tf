@@ -37,6 +37,9 @@ locals {
   lambda_function_name = "${local.s3_bucket_prefix}governed-query-${local.env}"
   lambda_role_arn      = "arn:${local.partition}:iam::${local.account_id}:role/${local.lambda_function_name}-exec"
 
+  gateway_lambda_function_name = "${local.s3_bucket_prefix}gateway-${local.env}"
+  gateway_lambda_role_arn      = "arn:${local.partition}:iam::${local.account_id}:role/${local.gateway_lambda_function_name}-exec"
+
   common_tags = merge(var.tags, {
     Project   = "guardrailed-agent"
     Env       = local.env
@@ -53,6 +56,7 @@ locals {
     [
       data.aws_caller_identity.current.arn,
       local.lambda_role_arn,
+      local.gateway_lambda_role_arn,
     ],
   )
 }
@@ -291,4 +295,102 @@ resource "aws_iam_policy" "mcp_governance_reader" {
   name        = "${local.s3_bucket_prefix}mcp-governance-reader-${local.env}"
   description = "Read-only governance probe permissions for the MCP server's tools 4-6 (ADR-009 Phase 2.b). Attach to MCP-runner principals; not auto-bound."
   policy      = data.aws_iam_policy_document.mcp_governance_reader.json
+}
+
+# =====================================================================
+# Phase 3.a — public web demo (auth, gateway, web-demo + SSM mirrors)
+# =====================================================================
+
+module "auth" {
+  source = "../../modules/auth"
+
+  env  = local.env
+  tags = local.common_tags
+
+  callback_urls = [
+    "https://${var.web_domain_name}/auth/callback",
+    "http://localhost:5173/auth/callback",
+  ]
+  logout_urls = [
+    "https://${var.web_domain_name}/",
+    "http://localhost:5173/",
+  ]
+
+  google_client_id     = var.google_client_id
+  google_client_secret = var.google_client_secret
+  github_client_id     = var.github_client_id
+  github_client_secret = var.github_client_secret
+  slack_client_id      = var.slack_client_id
+  slack_client_secret  = var.slack_client_secret
+}
+
+module "gateway" {
+  source = "../../modules/gateway"
+
+  env  = local.env
+  tags = local.common_tags
+
+  lambda_source_dir        = "${path.module}/../../../lambdas/gateway"
+  gagent_client_source_dir = "${path.module}/../../../gagent_client"
+
+  cognito_user_pool_arn       = module.auth.user_pool_arn
+  cognito_user_pool_endpoint  = module.auth.user_pool_endpoint
+  cognito_user_pool_client_id = module.auth.user_pool_client_id
+
+  agent_id        = module.agent.agent_id
+  agent_alias_id  = module.agent.agent_alias_id
+  agent_alias_arn = module.agent.agent_alias_arn
+
+  persona_role_arns = {
+    dispatcher      = module.identity.dispatcher_role_arn
+    technician_lead = module.identity.technician_lead_role_arn
+    owner           = module.identity.owner_role_arn
+  }
+
+  invocation_log_group     = module.observability.invocation_log_group
+  invocation_log_group_arn = module.observability.invocation_log_group_arn
+
+  persona_resolution_mode = var.gateway_persona_resolution_mode
+  default_service_region  = var.gateway_default_service_region
+  rate_limit_per_5min     = var.gateway_rate_limit_per_5min
+
+  cors_allowed_origins = [
+    "https://${var.web_domain_name}",
+    "http://localhost:5173",
+  ]
+}
+
+module "web_demo" {
+  source = "../../modules/web-demo"
+
+  env         = local.env
+  domain_name = var.web_domain_name
+  tags        = local.common_tags
+}
+
+# SSM mirror of the values the §15 web.yml workflow consumes (bucket name +
+# distribution id) and the seven build-time VITE_* values the operator
+# copies into GitHub Actions repository vars before the first deploy.
+locals {
+  phase_3a_ssm_params = {
+    web_bucket_name          = module.web_demo.bucket_name
+    web_distribution_id      = module.web_demo.distribution_id
+    api_endpoint             = module.gateway.api_endpoint
+    vite_api_endpoint        = module.gateway.api_endpoint
+    vite_user_pool_id        = module.auth.user_pool_id
+    vite_user_pool_client_id = module.auth.user_pool_client_id
+    vite_cognito_domain      = module.auth.hosted_ui_domain
+    vite_redirect_sign_in    = "https://${var.web_domain_name}/auth/callback"
+    vite_redirect_sign_out   = "https://${var.web_domain_name}/"
+    vite_aws_region          = var.region
+  }
+}
+
+resource "aws_ssm_parameter" "phase_3a" {
+  for_each = local.phase_3a_ssm_params
+
+  name  = "/gagent/${local.env}/${each.key}"
+  type  = "String"
+  value = each.value
+  tags  = local.common_tags
 }
