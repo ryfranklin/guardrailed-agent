@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { postAsk } from "../api/client";
-import { ApiError, type PersonaRole } from "../api/types";
+import {
+  ApiError,
+  type AskResponse,
+  type PersonaRole,
+} from "../api/types";
 import { useSession } from "../state/session";
 
 import {
@@ -17,6 +21,7 @@ interface ChatViewProps {
   role: PersonaRole;
   serviceRegion: string | null;
   onChangePersona: () => void;
+  onResponse?: (response: AskResponse) => void;
 }
 
 // A minimal prompt the agent can answer in one model turn with no tool
@@ -62,6 +67,7 @@ export function ChatView({
   role,
   serviceRegion,
   onChangePersona,
+  onResponse,
 }: ChatViewProps) {
   const sessionId = useSession();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -125,6 +131,7 @@ export function ChatView({
           guardrailBlocks: response.guardrail_blocks,
         };
         setMessages((prev) => [...prev, assistantMessage]);
+        onResponse?.(response);
       } catch (err) {
         if (err instanceof ApiError) {
           setError(formatApiError(err));
@@ -138,7 +145,7 @@ export function ChatView({
         setPendingStartedAt(null);
       }
     },
-    [role, serviceRegion],
+    [role, serviceRegion, onResponse],
   );
 
   return (

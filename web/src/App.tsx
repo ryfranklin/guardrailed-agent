@@ -1,16 +1,19 @@
 import { useState } from "react";
 
+import type { AskResponse } from "./api/types";
 import { ChatView } from "./components/ChatView";
 import { DataView } from "./components/DataView";
+import { FlowView } from "./components/FlowView";
 import { PersonaModal } from "./components/PersonaModal";
 import { usePersona } from "./state/persona";
 
-type Tab = "chat" | "data";
+type Tab = "chat" | "data" | "flow";
 
 export function App() {
   const persona = usePersona();
   const [picking, setPicking] = useState(true);
   const [tab, setTab] = useState<Tab>("chat");
+  const [lastResponse, setLastResponse] = useState<AskResponse | null>(null);
 
   if (picking || !persona.isReady || persona.role === null) {
     return (
@@ -29,6 +32,7 @@ export function App() {
 
   const onChangePersona = () => {
     persona.clearPersona();
+    setLastResponse(null);
     setPicking(true);
   };
 
@@ -50,21 +54,35 @@ export function App() {
         <TabButton active={tab === "data"} onClick={() => setTab("data")}>
           Data
         </TabButton>
+        <TabButton active={tab === "flow"} onClick={() => setTab("flow")}>
+          Flow
+        </TabButton>
       </nav>
       <div className="flex-1 overflow-hidden">
-        {tab === "chat" ? (
+        {tab === "chat" && (
           <ChatView
             key={personaKey}
             role={persona.role}
             serviceRegion={persona.serviceRegion}
             onChangePersona={onChangePersona}
+            onResponse={setLastResponse}
           />
-        ) : (
+        )}
+        {tab === "data" && (
           <DataView
             key={personaKey}
             role={persona.role}
             serviceRegion={persona.serviceRegion}
             onChangePersona={onChangePersona}
+          />
+        )}
+        {tab === "flow" && (
+          <FlowView
+            key={personaKey}
+            role={persona.role}
+            serviceRegion={persona.serviceRegion}
+            onChangePersona={onChangePersona}
+            response={lastResponse}
           />
         )}
       </div>
