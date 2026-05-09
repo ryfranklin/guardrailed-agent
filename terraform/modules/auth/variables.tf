@@ -39,19 +39,19 @@ variable "logout_urls" {
 }
 
 variable "id_token_validity_minutes" {
-  description = "ID token validity in minutes. ADR-007 default 60."
+  description = "ID token validity in minutes. ADR-007 set 60; ADR-013 §5.3 lowers to 30 to halve the blast radius of a leaked token."
   type        = number
-  default     = 60
+  default     = 30
 }
 
 variable "access_token_validity_minutes" {
-  description = "Access token validity in minutes. ADR-007 default 60."
+  description = "Access token validity in minutes. ADR-007 set 60; ADR-013 §5.3 lowers to 30 to halve the blast radius of a leaked token."
   type        = number
-  default     = 60
+  default     = 30
 }
 
 variable "refresh_token_validity_days" {
-  description = "Refresh token validity in days. ADR-007 default 30."
+  description = "Refresh token validity in days. Stays 30 per ADR-007; ADR-013 §5.3 explicitly preserves the refresh window for UX."
   type        = number
   default     = 30
 }

@@ -22,9 +22,9 @@ and [ADR-007](../../../../consulting/guardrailed-agent/decisions/007-multi-user-
 | `hosted_ui_domain_prefix` | no | `<name_prefix><env>` | Globally-unique Cognito-managed prefix. |
 | `callback_urls` | no | `demo.ms3dm.tech/auth/callback`, `localhost:5173/auth/callback` | Cognito callback URLs. |
 | `logout_urls` | no | `demo.ms3dm.tech/`, `localhost:5173/` | Cognito logout URLs. |
-| `id_token_validity_minutes` | no | 60 | Per ADR-007. |
-| `access_token_validity_minutes` | no | 60 | Per ADR-007. |
-| `refresh_token_validity_days` | no | 30 | Per ADR-007. |
+| `id_token_validity_minutes` | no | 30 | ADR-007 set 60; lowered to 30 by [ADR-013](../../../../consulting/guardrailed-agent/decisions/013-abuse-rate-limit-posture.md) §5.3. |
+| `access_token_validity_minutes` | no | 30 | ADR-007 set 60; lowered to 30 by [ADR-013](../../../../consulting/guardrailed-agent/decisions/013-abuse-rate-limit-posture.md) §5.3. |
+| `refresh_token_validity_days` | no | 30 | Per ADR-007; ADR-013 §5.3 explicitly preserves the refresh window for UX. |
 | `google_client_id` / `google_client_secret` | yes (sensitive) | — | Google OAuth credentials. |
 | `github_client_id` / `github_client_secret` | yes (sensitive) | — | GitHub OAuth app credentials. |
 | `slack_client_id` / `slack_client_secret` | yes (sensitive) | — | Slack "Sign in with Slack" credentials. |
