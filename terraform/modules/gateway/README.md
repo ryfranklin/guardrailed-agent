@@ -112,9 +112,14 @@ Three rules, REGIONAL scope, default action `Allow`:
 | 30 | `RateLimitPerIp` | Rate-based, `IP` aggregate, 5-min window | `block{}` |
 
 Each rule and the ACL itself emit CloudWatch metrics + sampled requests.
-Verify the rate rule by hammering the endpoint > `rate_limit_per_5min`
-times in 5 minutes from one IP — the 101st request returns 429 (per §6
-acceptance criterion 6).
+
+**The Web ACL is provisioned but not enforcing.** AWS WAFv2 does not
+support API Gateway HTTP API (v2) stages — the rules above are visible in
+the WAF console and emit metrics, but no inbound request is evaluated
+against them. The deferral and the three unblocking options (AWS adds
+support, migrate to REST API, or front with CloudFront) are tracked in
+[docs/adr-013-waf-association-deferral.md](../../../docs/adr-013-waf-association-deferral.md).
+See also the comment block in `waf.tf`.
 
 ## X-Ray
 

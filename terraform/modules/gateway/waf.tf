@@ -86,16 +86,18 @@ resource "aws_wafv2_web_acl" "this" {
   tags = var.tags
 }
 
-# aws_wafv2_web_acl_association deferred to Phase 3.5.
-#
-# AWS WAFv2 supports REST API (v1) stages, ALB, AppSync, CloudFront, Cognito,
-# AppRunner, and Amplify — but NOT API Gateway HTTP API (v2) stages. The
-# AssociateWebACL call returns WAFInvalidParameterException for HTTP API
-# stage ARNs. The brief's §10 spec assumed support; it doesn't exist.
+# aws_wafv2_web_acl_association deferred. ADR-013 §5.1 proposed un-deferring
+# this in May 2026; re-verification against the current AWS WAF docs
+# (docs.aws.amazon.com/waf/latest/developerguide/how-aws-waf-works-resources.html)
+# confirmed the constraint still holds: WAFv2 supports REST API (v1) stages,
+# ALB, AppSync, CloudFront, Cognito, AppRunner, Verified Access, and Amplify
+# — but NOT API Gateway HTTP API (v2) stages. AssociateWebACL returns
+# WAFInvalidParameterException for HTTP API stage ARNs.
 #
 # The WAF ACL above is created with the three rules per ADR-010 §5 and is
-# observable via CloudWatch metrics, but it is NOT enforcing on the HTTP API
-# until one of these unblocks the association in 3.5:
+# observable via CloudWatch metrics, but it is NOT enforcing on the HTTP API.
+# The deferral now lives in docs/adr-013-waf-association-deferral.md, which
+# tracks the three unblocking options:
 #   1. AWS adds HTTP API v2 to the WAFv2 supported-resource set.
 #   2. Migrate the gateway from HTTP API → REST API.
 #   3. Front the HTTP API with CloudFront and attach WAF to that.
