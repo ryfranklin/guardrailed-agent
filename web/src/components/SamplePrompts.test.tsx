@@ -9,8 +9,24 @@ describe("SamplePrompts", () => {
     expect(
       screen.getByRole("button", { name: /show me a list of customers/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Lake Formation denies the PII columns/i))
+    expect(screen.getByText(/dispatcher's tag policy denies/i))
       .toBeInTheDocument();
+  });
+
+  it("renders in sidebar layout by default (no centering wrapper)", () => {
+    render(<SamplePrompts role="owner" onSubmit={() => {}} />);
+    const wrapper = screen.getByTestId("sample-prompts");
+    expect(wrapper.className).not.toContain("items-center");
+    expect(wrapper.className).toContain("overflow-y-auto");
+  });
+
+  it("renders in centered layout when layout='centered'", () => {
+    render(
+      <SamplePrompts role="owner" onSubmit={() => {}} layout="centered" />,
+    );
+    const wrapper = screen.getByTestId("sample-prompts");
+    expect(wrapper.className).toContain("items-center");
+    expect(wrapper.className).toContain("justify-center");
   });
 
   it("renders technician_lead prompts that reference the service region", () => {

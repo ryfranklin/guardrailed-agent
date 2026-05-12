@@ -179,24 +179,36 @@ export function ChatView({
       {error && (
         <ErrorBanner message={error} onDismiss={() => setError(null)} />
       )}
-      <MessageList
-        messages={messages}
-        pending={pending}
-        pendingStartedAt={pendingStartedAt}
-        emptyState={
-          warmupState === "warming" ? null : (
-            <SamplePrompts
-              role={role}
-              disabled={pending}
-              onSubmit={submit}
-            />
-          )
-        }
-      />
-      <ComposerInput
-        disabled={pending || warmupState === "warming"}
-        onSubmit={submit}
-      />
+      <div className="flex flex-1 min-h-0">
+        <div className="flex flex-1 flex-col min-w-0">
+          <MessageList
+            messages={messages}
+            pending={pending}
+            pendingStartedAt={pendingStartedAt}
+            emptyState={
+              warmupState === "warming" ? null : (
+                <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-400">
+                  Pick a sample query from the right, or type your own below.
+                </div>
+              )
+            }
+          />
+          <ComposerInput
+            disabled={pending || warmupState === "warming"}
+            onSubmit={submit}
+          />
+        </div>
+        <aside
+          className="hidden w-80 shrink-0 overflow-hidden border-l border-slate-200 bg-slate-50 md:flex md:flex-col"
+          data-testid="sample-prompts-sidebar"
+        >
+          <SamplePrompts
+            role={role}
+            disabled={pending || warmupState === "warming"}
+            onSubmit={submit}
+          />
+        </aside>
+      </div>
     </section>
   );
 }
