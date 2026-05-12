@@ -378,3 +378,98 @@ class TestSqlAssembly:
         sql, _ = handler.build_query(template, parsed)
         assert "FROM truck_roll" in sql
         assert "WHERE deleted_at IS NULL" in sql
+
+
+# ---------- column-deny retry (SELECT *) ----------
+
+class TestColumnDenyRetry:
+    """When the persona's tag policy denies one of the explicit columns,
+    Lake Formation rejects the whole query. The Lambda retries once with
+    SELECT * so LF transparently filters the result to the visible
+    column subset — honoring the persona description's "PII redacted"
+    promise.
+    """
+
+    def _fake_athena_chain(self):
+        """Build a MagicMock that fails the first start+wait then
+        succeeds on the second."""
+        from unittest.mock import MagicMock
+        from botocore.exceptions import ClientError as Cli
+
+        athena = MagicMock()
+        # Two distinct execution IDs; status differs by call number.
+        athena.start_query_execution.side_effect = [
+            {"QueryExecutionId": "deny-1"},
+            {"QueryExecutionId": "ok-2"},
+        ]
+        def _get_exec(QueryExecutionId, **_):
+            if QueryExecutionId == "deny-1":
+                return {"QueryExecution": {"Status": {
+                    "State": "FAILED",
+                    "StateChangeReason": "Insufficient permissions: access denied on column billing_notes",
+                }}}
+            return {"QueryExecution": {"Status": {"State": "SUCCEEDED"}}}
+        athena.get_query_execution.side_effect = _get_exec
+        # Paginator for results returns 1 header row + 1 data row.
+        paginator = MagicMock()
+        paginator.paginate.return_value = [{
+            "ResultSet": {
+                "ResultSetMetadata": {"ColumnInfo": [
+                    {"Name": "job_id"}, {"Name": "scheduled_date"},
+                ]},
+                "Rows": [
+                    {"Data": [{"VarCharValue": "job_id"}, {"VarCharValue": "scheduled_date"}]},
+                    {"Data": [{"VarCharValue": "j-1"}, {"VarCharValue": "2026-05-12"}]},
+                ],
+            }
+        }]
+        athena.get_paginator.return_value = paginator
+        return athena, Cli  # noqa: RUF100
+
+    def test_execute_query_select_star_vs_explicit(self):
+        """build_query semantics: preview=True yields SELECT *, otherwise
+        explicit column list."""
+        template = handler.TEMPLATES["/jobs"]
+        parsed = {
+            "as_of_date": None, "include_deleted": False,
+            "eq_filters": {}, "range_filters": {}, "limit": 15,
+            "preview": False, "question_intent": "",
+        }
+        sql_explicit, _ = handler.build_query(template, parsed)
+        sql_star, _ = handler.build_query(template, {**parsed, "preview": True})
+        assert sql_explicit.startswith("SELECT job_id, customer_id")
+        assert sql_star.startswith("SELECT * FROM service_job")
+        # Both end with the same predicate + limit so LF column-filtering
+        # is the only behavioral change.
+        assert sql_explicit.endswith("WHERE deleted_at IS NULL LIMIT 15")
+        assert sql_star.endswith("WHERE deleted_at IS NULL LIMIT 15")
+
+    def test_run_query_retries_with_preview_on_column_deny(self):
+        """End-to-end retry path: STS + Athena mocked, first call denies,
+        second call succeeds. The persona ends up with the SELECT * result."""
+        from unittest.mock import patch
+
+        athena, _ = self._fake_athena_chain()
+        with patch.object(handler.boto3, "client", return_value=athena), \
+             patch.object(handler, "_assume_persona", return_value={
+                 "AccessKeyId": "a", "SecretAccessKey": "b", "SessionToken": "c",
+             }):
+            template = handler.TEMPLATES["/jobs"]
+            parsed = {
+                "as_of_date": None, "include_deleted": False,
+                "eq_filters": {}, "range_filters": {}, "limit": 15,
+                "preview": False, "question_intent": "",
+            }
+            rows, cols = handler._run_query(
+                _persona("dispatcher"), template, parsed,
+            )
+        # The retry's SELECT * succeeded; the column set reflects what
+        # LF would return (here mocked to job_id + scheduled_date).
+        assert cols == ["job_id", "scheduled_date"]
+        assert rows == [{"job_id": "j-1", "scheduled_date": "2026-05-12"}]
+        # Two start_query calls: first explicit-cols, second SELECT *.
+        assert athena.start_query_execution.call_count == 2
+        first_sql = athena.start_query_execution.call_args_list[0].kwargs["QueryString"]
+        second_sql = athena.start_query_execution.call_args_list[1].kwargs["QueryString"]
+        assert first_sql.startswith("SELECT job_id, customer_id")
+        assert second_sql.startswith("SELECT * FROM service_job")

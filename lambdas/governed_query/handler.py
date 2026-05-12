@@ -473,6 +473,35 @@ def _run_query(
         config=Config(retries={"max_attempts": 3, "mode": "standard"}),
     )
 
+    try:
+        return _execute_query(athena, persona, template, parsed)
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code", "")
+        if code not in ("AccessDeniedException", "AccessDenied"):
+            raise
+        if parsed.get("preview"):
+            # Already running SELECT *; the deny is at the table or row
+            # layer, not column. Nothing further to try.
+            raise
+        # Column-level deny: the persona's tag policy doesn't grant SELECT
+        # on every column in the template's explicit list. Retry with
+        # SELECT * so Lake Formation transparently filters the returned
+        # column set down to what the persona can see. This honors the
+        # persona description's "PII columns redacted" promise without
+        # giving up on the call entirely.
+        logger.info(
+            "column-deny retry persona=%s template=%s; switching to SELECT *",
+            persona.role, template.name,
+        )
+        return _execute_query(athena, persona, template, {**parsed, "preview": True})
+
+
+def _execute_query(
+    athena: Any,
+    persona: PersonaContext,
+    template: TemplateSpec,
+    parsed: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[str]]:
     sql, params = build_query(template, parsed)
     logger.info("athena query persona=%s template=%s sql=%s",
                 persona.role, template.name, sql)
@@ -486,7 +515,6 @@ def _run_query(
         start_kwargs["ExecutionParameters"] = params
 
     execution_id = athena.start_query_execution(**start_kwargs)["QueryExecutionId"]
-
     _wait_for_query(athena, execution_id)
     return _fetch_results(athena, execution_id)
 

@@ -9,15 +9,15 @@ const PROMPTS_BY_ROLE: Record<PersonaRole, SamplePrompt[]> = {
   dispatcher: [
     {
       text: "Show me a list of customers",
-      hint: "Hard wall — PII columns are tagged pii=true and dispatcher's tag policy denies them",
+      hint: "Lake Formation strips PII columns (first_name, email, phone, etc.); operational fields survive",
+    },
+    {
+      text: "Show me open jobs scheduled for today",
+      hint: "All job fields except billing_notes (PII) — Lambda retries with SELECT * so LF column-filters transparently",
     },
     {
       text: "What customers have the highest churn risk?",
-      hint: "Reads derived signals from customer_signal_daily — no raw PII columns",
-    },
-    {
-      text: "List service jobs scheduled this week",
-      hint: "Operational fields only; deleted rows and revenue columns hidden",
+      hint: "customer_signal_daily — engagement_score, churn_risk, next_best_action are all non-PII",
     },
   ],
   technician_lead: [

@@ -4,13 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import { SamplePrompts } from "./SamplePrompts";
 
 describe("SamplePrompts", () => {
-  it("renders dispatcher prompts that highlight LF enforcement", () => {
+  it("renders dispatcher prompts that highlight LF column filtering", () => {
     render(<SamplePrompts role="dispatcher" onSubmit={() => {}} />);
     expect(
       screen.getByRole("button", { name: /show me a list of customers/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/dispatcher's tag policy denies/i))
-      .toBeInTheDocument();
+    expect(screen.getByText(/strips PII columns/i)).toBeInTheDocument();
   });
 
   it("renders in sidebar layout by default (no centering wrapper)", () => {
