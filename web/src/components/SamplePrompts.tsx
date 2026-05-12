@@ -9,7 +9,7 @@ const PROMPTS_BY_ROLE: Record<PersonaRole, SamplePrompt[]> = {
   dispatcher: [
     {
       text: "Show me a list of customers",
-      hint: "PII columns come back redacted",
+      hint: "Dispatcher is blocked — Lake Formation denies the PII columns",
     },
     {
       text: "What customers have the highest churn risk?",

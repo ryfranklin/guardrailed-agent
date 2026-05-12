@@ -4,12 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import { SamplePrompts } from "./SamplePrompts";
 
 describe("SamplePrompts", () => {
-  it("renders dispatcher prompts that highlight PII redaction", () => {
+  it("renders dispatcher prompts that highlight LF enforcement", () => {
     render(<SamplePrompts role="dispatcher" onSubmit={() => {}} />);
     expect(
       screen.getByRole("button", { name: /show me a list of customers/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/PII columns come back redacted/i))
+    expect(screen.getByText(/Lake Formation denies the PII columns/i))
       .toBeInTheDocument();
   });
 
