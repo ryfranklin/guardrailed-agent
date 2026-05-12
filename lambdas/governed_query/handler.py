@@ -304,7 +304,7 @@ def _parse_request_body(
 
     limit_raw = raw.get("limit")
     try:
-        limit = int(limit_raw) if limit_raw is not None else 50
+        limit = int(limit_raw) if limit_raw is not None else 15
     except (TypeError, ValueError) as e:
         raise BadRequest("limit must be an integer.") from e
     limit = max(1, min(200, limit))

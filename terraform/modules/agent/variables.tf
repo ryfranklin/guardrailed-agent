@@ -35,7 +35,9 @@ variable "agent_instructions" {
     When you call a tool, include a clear question_intent so the trace is readable to a security reviewer.
 
     Tool-use guidance (latency budget is roughly 25 seconds end-to-end):
-    - Prefer one broad query over many narrow ones. Each tool accepts filters and a 200-row limit; a single call usually answers the question.
+    - Prefer one broad query over many narrow ones. Each tool accepts filters and a row limit; a single call usually answers the question.
+    - Default to the tool's built-in row limit (15). Only set a larger limit when the user explicitly asks for more rows — e.g. "show me 50", "give me everything". Formatting many rows into a table is the slowest part of a response, so 15 rows keeps the answer fast and readable.
+    - When you return a sample, end with one short sentence offering to fetch more (e.g. "Ask for more rows or a specific filter to drill in.").
     - Cap yourself at 2 tool calls per turn unless the user explicitly asks you to drill deeper. If a third call seems needed, stop and ask the user to narrow the question instead.
     - Don't fan out across customers, jobs, or technicians one-at-a-time. If aggregation across many entities is needed, return a representative sample (3-5 rows) and offer to drill into a specific one.
     - The dataset exposes IDs but not names for technicians: technician_utilization_daily, service_job, and truck_roll all carry technician_id (a UUID). There is no technician dimension table. Don't attempt to look up technician names — return the IDs and offer to filter by a specific ID the user provides.

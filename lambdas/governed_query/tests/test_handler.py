@@ -125,14 +125,14 @@ class TestCustomersTemplate:
 
     def test_default_predicate_is_is_current_true(self):
         parsed = {"as_of_date": None, "include_deleted": False,
-                  "eq_filters": {}, "range_filters": {}, "limit": 50}
+                  "eq_filters": {}, "range_filters": {}, "limit": 15}
         sql, params = handler.build_query(self.template, parsed)
         assert "is_current = TRUE" in sql
         assert params == []
 
     def test_as_of_date_swaps_to_point_in_time(self):
         parsed = {"as_of_date": "2026-01-01", "include_deleted": False,
-                  "eq_filters": {}, "range_filters": {}, "limit": 50}
+                  "eq_filters": {}, "range_filters": {}, "limit": 15}
         sql, params = handler.build_query(self.template, parsed)
         assert "is_current" not in sql
         assert "effective_from <= timestamp '2026-01-01'" in sql
@@ -179,7 +179,7 @@ class TestSoftDeleteTemplates:
     def test_default_predicate_is_deleted_at_null(self, api_path):
         template = handler.TEMPLATES[api_path]
         parsed = {"as_of_date": None, "include_deleted": False,
-                  "eq_filters": {}, "range_filters": {}, "limit": 50}
+                  "eq_filters": {}, "range_filters": {}, "limit": 15}
         sql, _ = handler.build_query(template, parsed)
         assert "deleted_at IS NULL" in sql
 
@@ -241,7 +241,7 @@ class TestPlainFactTemplates:
     def test_no_default_predicate(self, api_path):
         template = handler.TEMPLATES[api_path]
         parsed = {"as_of_date": None, "include_deleted": False,
-                  "eq_filters": {}, "range_filters": {}, "limit": 50}
+                  "eq_filters": {}, "range_filters": {}, "limit": 15}
         sql, _ = handler.build_query(template, parsed)
         assert "is_current" not in sql
         assert "deleted_at" not in sql
@@ -272,13 +272,13 @@ class TestPlainFactTemplates:
 # ---------- limit handling ----------
 
 class TestLimit:
-    def test_default_limit_50(self):
+    def test_default_limit(self):
         template = handler.TEMPLATES["/customers"]
         parsed = handler._parse_request_body(
             _event("dispatcher", "/customers"),
             template, _persona("dispatcher"),
         )
-        assert parsed["limit"] == 50
+        assert parsed["limit"] == 15
 
     def test_clamp_max_200(self):
         template = handler.TEMPLATES["/customers"]
@@ -367,7 +367,7 @@ class TestSqlAssembly:
         assert sql.startswith("SELECT customer_id, customer_type")
         assert "FROM customer" in sql
         assert "WHERE is_current = TRUE" in sql
-        assert sql.endswith("LIMIT 50")
+        assert sql.endswith("LIMIT 15")
 
     def test_truck_rolls_default_sql(self):
         template = handler.TEMPLATES["/truck_rolls"]

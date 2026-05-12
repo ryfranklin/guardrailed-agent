@@ -164,8 +164,8 @@ locals {
       type        = "integer"
       minimum     = 1
       maximum     = 200
-      default     = 50
-      description = "Maximum rows to return. Hard cap at 200."
+      default     = 15
+      description = "Maximum rows to return. Default 15 keeps the response inside the 30s API Gateway window; the agent should ask for more (up to 200) only when the user explicitly requests it."
     }
   }
 
