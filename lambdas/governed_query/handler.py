@@ -233,17 +233,14 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         template = _resolve_template(event)
         body = _parse_request_body(event, template, persona)
         rows, columns = _run_query(persona, template, body)
-        response_body: dict[str, Any] = {
+        return _agent_response(event, 200, {
             "rows": rows,
             "row_count": len(rows),
             "columns": columns,
             "template": template.name,
             "persona": persona.role,
             "question_intent": body.get("question_intent") or "",
-        }
-        if rows and not body.get("preview"):
-            response_body["markdown_table"] = _render_markdown_table(rows, columns)
-        return _agent_response(event, 200, response_body)
+        })
     except BadRequest as exc:
         logger.warning("bad request: %s", exc)
         return _agent_response(event, 400, {"error": str(exc)})
@@ -551,27 +548,6 @@ def _fetch_results(
             values = [cell.get("VarCharValue") for cell in row["Data"]]
             rows.append(dict(zip(columns, values, strict=True)))
     return rows, columns
-
-
-def _render_markdown_table(rows: list[dict[str, Any]], columns: list[str]) -> str:
-    """Pre-render the result set as a GitHub-flavored markdown table.
-
-    Why: the foundation model formatting 15+ rows into a table dominates
-    end-to-end latency. Returning a ready-to-paste string lets the agent
-    pass it through verbatim instead.
-    """
-    def _cell(value: Any) -> str:
-        if value is None:
-            return ""
-        return str(value).replace("|", "\\|").replace("\n", " ")
-
-    header = "| " + " | ".join(columns) + " |"
-    separator = "| " + " | ".join(["---"] * len(columns)) + " |"
-    body_lines = [
-        "| " + " | ".join(_cell(row.get(col)) for col in columns) + " |"
-        for row in rows
-    ]
-    return "\n".join([header, separator, *body_lines])
 
 
 def _agent_response(event: dict[str, Any], status: int, body: dict[str, Any]) -> dict[str, Any]:
