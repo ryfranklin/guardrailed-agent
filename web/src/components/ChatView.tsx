@@ -15,6 +15,7 @@ import {
 import { ComposerInput } from "./ComposerInput";
 import { ErrorBanner } from "./ErrorBanner";
 import { PersonaIndicator } from "./PersonaIndicator";
+import { SamplePrompts } from "./SamplePrompts";
 import { Spinner } from "./Spinner";
 
 interface ChatViewProps {
@@ -182,6 +183,15 @@ export function ChatView({
         messages={messages}
         pending={pending}
         pendingStartedAt={pendingStartedAt}
+        emptyState={
+          warmupState === "warming" ? null : (
+            <SamplePrompts
+              role={role}
+              disabled={pending}
+              onSubmit={submit}
+            />
+          )
+        }
       />
       <ComposerInput
         disabled={pending || warmupState === "warming"}

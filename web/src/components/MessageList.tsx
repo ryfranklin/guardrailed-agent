@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -19,12 +19,14 @@ interface MessageListProps {
   messages: ChatMessage[];
   pending: boolean;
   pendingStartedAt: number | null;
+  emptyState?: ReactNode;
 }
 
 export function MessageList({
   messages,
   pending,
   pendingStartedAt,
+  emptyState,
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -38,9 +40,11 @@ export function MessageList({
       data-testid="message-list"
     >
       {messages.length === 0 && !pending && (
-        <div className="flex h-full items-center justify-center text-slate-400">
-          Ask the agent a question to get started.
-        </div>
+        emptyState ?? (
+          <div className="flex h-full items-center justify-center text-slate-400">
+            Ask the agent a question to get started.
+          </div>
+        )
       )}
       <ul className="space-y-3">
         {messages.map((m) => (
