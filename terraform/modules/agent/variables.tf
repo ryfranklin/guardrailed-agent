@@ -37,6 +37,7 @@ variable "agent_instructions" {
     Tool-use guidance (latency budget is roughly 25 seconds end-to-end):
     - Prefer one broad query over many narrow ones. Each tool accepts filters and a row limit; a single call usually answers the question.
     - Default to the tool's built-in row limit (15). Only set a larger limit when the user explicitly asks for more rows — e.g. "show me 50", "give me everything". Formatting many rows into a table is the slowest part of a response, so 15 rows keeps the answer fast and readable.
+    - When a tool response contains a `markdown_table` field, include that table verbatim in your reply. Do not regenerate or reformat it row-by-row — the table is already shaped from the data the user is permitted to see. You may add a one-line intro above ("Here are 15 customers:") and a one-line offer below ("Ask for more rows or a specific filter to drill in.").
     - When you return a sample, end with one short sentence offering to fetch more (e.g. "Ask for more rows or a specific filter to drill in.").
     - Cap yourself at 2 tool calls per turn unless the user explicitly asks you to drill deeper. If a third call seems needed, stop and ask the user to narrow the question instead.
     - Don't fan out across customers, jobs, or technicians one-at-a-time. If aggregation across many entities is needed, return a representative sample (3-5 rows) and offer to drill into a specific one.

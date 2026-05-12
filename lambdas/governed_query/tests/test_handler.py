@@ -378,3 +378,37 @@ class TestSqlAssembly:
         sql, _ = handler.build_query(template, parsed)
         assert "FROM truck_roll" in sql
         assert "WHERE deleted_at IS NULL" in sql
+
+
+# ---------- markdown table rendering (option B) ----------
+
+class TestMarkdownTable:
+    def test_basic_render(self):
+        rows = [
+            {"a": "1", "b": "x"},
+            {"a": "2", "b": "y"},
+        ]
+        table = handler._render_markdown_table(rows, ["a", "b"])
+        assert table.splitlines() == [
+            "| a | b |",
+            "| --- | --- |",
+            "| 1 | x |",
+            "| 2 | y |",
+        ]
+
+    def test_null_cells_render_blank(self):
+        rows = [{"a": "1", "b": None}]
+        table = handler._render_markdown_table(rows, ["a", "b"])
+        assert table.endswith("| 1 |  |")
+
+    def test_pipe_in_cell_is_escaped(self):
+        rows = [{"note": "a|b"}]
+        table = handler._render_markdown_table(rows, ["note"])
+        assert "| a\\|b |" in table
+
+    def test_newline_in_cell_collapsed(self):
+        rows = [{"note": "line1\nline2"}]
+        table = handler._render_markdown_table(rows, ["note"])
+        for line in table.splitlines():
+            assert "\n" not in line.strip()
+        assert "line1 line2" in table
