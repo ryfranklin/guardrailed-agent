@@ -52,6 +52,28 @@ class InvocationResponse:
     log_stream: str | None = None
 
 
+def _with_persona_context(question: str, persona: Persona) -> str:
+    """Prepend a one-line operational context to the user's question.
+
+    The IAM session tag (service_region) drives Lake Formation row
+    filtering but never reaches the model. Without this prefix, the
+    technician_lead asking "show me customers in my region" makes the
+    model ask the user for a region it should already know. The data
+    system is still authoritative — this just tells the model what
+    "my region" means.
+    """
+    lines = [f"[Persona context: you are acting as {persona.role}."]
+    if persona.service_region:
+        lines.append(
+            f"Your assigned service region is '{persona.service_region}'. "
+            "If the user says 'my region', 'my service area', or similar, "
+            "they mean this region. The data system already filters rows "
+            "to it; do not ask the user for the region."
+        )
+    lines.append("]")
+    return " ".join(lines) + "\n\n" + question
+
+
 def assume_persona(
     persona: Persona,
     *,
@@ -134,12 +156,14 @@ def invoke(
     if persona.service_region:
         session_attrs["service_region"] = persona.service_region
 
+    contextualized_input = _with_persona_context(question, persona)
+
     started = time.time()
     response = runtime.invoke_agent(
         agentId=agent_id,
         agentAliasId=agent_alias_id,
         sessionId=session_id,
-        inputText=question,
+        inputText=contextualized_input,
         enableTrace=enable_trace,
         sessionState={"sessionAttributes": session_attrs},
     )
