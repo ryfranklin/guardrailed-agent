@@ -100,39 +100,3 @@ variable "cost_alarm_hard_stop_threshold_usd" {
   type        = number
   default     = 200
 }
-
-variable "google_client_id" {
-  description = "Google OAuth client ID for Cognito federation. Pass via TF_VAR_google_client_id; never commit."
-  type        = string
-  sensitive   = true
-}
-
-variable "google_client_secret" {
-  description = "Google OAuth client secret. Pass via TF_VAR_google_client_secret; never commit."
-  type        = string
-  sensitive   = true
-}
-
-variable "github_client_id" {
-  description = "GitHub OAuth app client ID (wrapped via Cognito's generic OIDC provider). Pass via TF_VAR_github_client_id; never commit."
-  type        = string
-  sensitive   = true
-}
-
-variable "github_client_secret" {
-  description = "GitHub OAuth app client secret. Pass via TF_VAR_github_client_secret; never commit."
-  type        = string
-  sensitive   = true
-}
-
-variable "slack_client_id" {
-  description = "Slack 'Sign in with Slack' OIDC client ID. Pass via TF_VAR_slack_client_id; never commit."
-  type        = string
-  sensitive   = true
-}
-
-variable "slack_client_secret" {
-  description = "Slack 'Sign in with Slack' OIDC client secret. Pass via TF_VAR_slack_client_secret; never commit."
-  type        = string
-  sensitive   = true
-}

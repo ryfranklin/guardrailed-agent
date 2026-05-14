@@ -1,7 +1,9 @@
 # auth
 
-Cognito User Pool, Hosted UI domain, app client, and federated identity
-providers (Google, GitHub, Slack) for the Phase 3.a public web demo.
+Cognito User Pool, Hosted UI domain, and app client for the Phase 3.a
+public web demo. The Hosted UI surfaces email/password sign-in only;
+federated identity providers (Google, GitHub, Slack) are deferred to
+Phase 3.5 — see the comment in `main.tf` for the rationale.
 
 The pool fronts a single SPA client (`generate_secret = false`) and is
 consumed by:
@@ -25,9 +27,7 @@ and [ADR-007](../../../../consulting/guardrailed-agent/decisions/007-multi-user-
 | `id_token_validity_minutes` | no | 30 | ADR-007 set 60; lowered to 30 by [ADR-013](../../../../consulting/guardrailed-agent/decisions/013-abuse-rate-limit-posture.md) §5.3. |
 | `access_token_validity_minutes` | no | 30 | ADR-007 set 60; lowered to 30 by [ADR-013](../../../../consulting/guardrailed-agent/decisions/013-abuse-rate-limit-posture.md) §5.3. |
 | `refresh_token_validity_days` | no | 30 | Per ADR-007; ADR-013 §5.3 explicitly preserves the refresh window for UX. |
-| `google_client_id` / `google_client_secret` | yes (sensitive) | — | Google OAuth credentials. |
-| `github_client_id` / `github_client_secret` | yes (sensitive) | — | GitHub OAuth app credentials. |
-| `slack_client_id` / `slack_client_secret` | yes (sensitive) | — | Slack "Sign in with Slack" credentials. |
+| `github_client_id` / `github_client_secret` | no (sensitive) | `""` | Reserved for the Phase 3.5 GitHub-as-OIDC reintroduction. Not consumed by any resource today. |
 | `tags` | no | `{}` | Common tags. |
 
 Secrets are passed via `TF_VAR_<name>` or a gitignored `terraform.tfvars`.
@@ -46,62 +46,16 @@ Never commit them.
 | `jwt_issuer_url` | `https://<endpoint>`; feeds the API Gateway JWT authorizer. |
 | `supported_identity_providers` | List enabled on the SPA client. |
 
-## Identity provider attribute mapping
+## Identity providers
 
-The Cognito built-in attributes the SPA receives in JWT claims are populated
-from each IdP as follows.
-
-### Google (`provider_type = Google`)
-
-| Cognito attr | Google claim |
-|---|---|
-| `email` | `email` |
-| `username` | `sub` |
-| `name` | `name` |
-
-Authorize scopes: `openid email profile`.
-
-### GitHub (generic OIDC)
-
-GitHub does not natively expose OpenID Connect — no JWKS, no discovery
-document. Cognito's generic OIDC provider wraps GitHub's OAuth 2.0 endpoints
-and fetches the user-info via `GET https://api.github.com/user`. The
-`openid` scope is included in `authorize_scopes` to satisfy Cognito's
-generic-OIDC requirement; GitHub itself ignores it.
-
-| Cognito attr | GitHub user-info field |
-|---|---|
-| `email` | `email` |
-| `username` | `id` |
-| `name` | `name` |
-
-Endpoints:
-- authorize: `https://github.com/login/oauth/authorize`
-- token: `https://github.com/login/oauth/access_token`
-- attributes: `https://api.github.com/user` (GET)
-
-If the GitHub flow proves brittle in practice, the brief allows simplifying
-to Google + email/password for v1 launch and reintroducing GitHub in
-Phase 3.5; the SPA's `supported_identity_providers` list and the
-`aws_cognito_identity_provider.github` resource are the only things to
-remove.
-
-### Slack (generic OIDC, "Sign in with Slack")
-
-Slack supports proper OpenID Connect, including JWKS. Endpoints:
-
-- authorize: `https://slack.com/openid/connect/authorize`
-- token: `https://slack.com/api/openid.connect.token`
-- attributes: `https://slack.com/api/openid.connect.userInfo` (GET)
-- jwks: `https://slack.com/openid/connect/keys`
-
-| Cognito attr | Slack claim |
-|---|---|
-| `email` | `email` |
-| `username` | `sub` |
-| `name` | `name` |
-
-Authorize scopes: `openid email profile`.
+`supported_identity_providers` is currently `["COGNITO"]` only — the Hosted
+UI shows email/password sign-in. The Google and Slack `aws_cognito_identity_provider`
+resources were removed because their redirect flows broke in practice;
+GitHub-as-OIDC was never enabled (Cognito's generic OIDC provider rejects
+the GitHub username mapping — no `sub` claim). Reintroducing them is a
+Phase 3.5 follow-up — see the comment block at the top of `main.tf` for
+the per-IdP context, including the previously-validated attribute mappings
+preserved in the git history.
 
 ## Custom attributes
 

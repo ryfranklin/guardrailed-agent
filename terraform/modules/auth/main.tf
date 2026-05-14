@@ -14,11 +14,9 @@ locals {
   pool_name          = "${var.name_prefix}${var.env}"
   client_name        = "${var.name_prefix}${var.env}-web"
   hosted_domain      = coalesce(var.hosted_ui_domain_prefix, local.pool_name)
-  google_provider    = "Google"
   github_provider    = "GitHub"
-  slack_provider     = "Slack"
   cognito_provider   = "COGNITO"
-  identity_providers = [local.cognito_provider, local.google_provider, local.slack_provider]
+  identity_providers = [local.cognito_provider]
 }
 
 resource "aws_cognito_user_pool" "this" {
@@ -74,58 +72,15 @@ resource "aws_cognito_user_pool_domain" "this" {
   user_pool_id = aws_cognito_user_pool.this.id
 }
 
-resource "aws_cognito_identity_provider" "google" {
-  user_pool_id  = aws_cognito_user_pool.this.id
-  provider_name = local.google_provider
-  provider_type = "Google"
-
-  provider_details = {
-    client_id        = var.google_client_id
-    client_secret    = var.google_client_secret
-    authorize_scopes = "openid email profile"
-  }
-
-  attribute_mapping = {
-    email    = "email"
-    username = "sub"
-    name     = "name"
-  }
-}
-
-# GitHub-as-OIDC deferred to Phase 3.5. Cognito's generic-OIDC provider rejects
-# the username attribute mapping with "id cannot be mapped to username" because
-# GitHub does not expose a `sub` claim — the only field Cognito will accept as
-# the username source. The brief (§7.4) explicitly allows simplifying to
-# Google + email/password for v1 launch when GitHub-as-OIDC is brittle. The
-# github_client_id / github_client_secret variables remain declared so adding
-# the resource back in Phase 3.5 is a code-only change.
-#
-# resource "aws_cognito_identity_provider" "github" { ... }
-
-resource "aws_cognito_identity_provider" "slack" {
-  user_pool_id  = aws_cognito_user_pool.this.id
-  provider_name = local.slack_provider
-  provider_type = "OIDC"
-
-  provider_details = {
-    client_id                     = var.slack_client_id
-    client_secret                 = var.slack_client_secret
-    authorize_scopes              = "openid email profile"
-    attributes_request_method     = "GET"
-    oidc_issuer                   = "https://slack.com"
-    authorize_url                 = "https://slack.com/openid/connect/authorize"
-    token_url                     = "https://slack.com/api/openid.connect.token"
-    attributes_url                = "https://slack.com/api/openid.connect.userInfo"
-    jwks_uri                      = "https://slack.com/openid/connect/keys"
-    attributes_url_add_attributes = "false"
-  }
-
-  attribute_mapping = {
-    email    = "email"
-    username = "sub"
-    name     = "name"
-  }
-}
+# Federated identity providers (Google, GitHub, Slack) are deferred to
+# Phase 3.5. Google and Slack were wired during Phase 3.a but the redirect
+# flows broke in practice and were removed; GitHub-as-OIDC was never enabled
+# because Cognito's generic-OIDC provider rejects the username mapping
+# (no `sub` claim). The brief (§7.4) explicitly allows simplifying to
+# email/password for v1 launch. The github_client_id / github_client_secret
+# variables remain declared so adding GitHub back in Phase 3.5 is a code-only
+# change; google_/slack_ variables were removed and will be reintroduced when
+# those flows are fixed.
 
 resource "aws_cognito_user_pool_client" "web" {
   name         = local.client_name
@@ -160,9 +115,4 @@ resource "aws_cognito_user_pool_client" "web" {
   }
 
   enable_token_revocation = true
-
-  depends_on = [
-    aws_cognito_identity_provider.google,
-    aws_cognito_identity_provider.slack,
-  ]
 }

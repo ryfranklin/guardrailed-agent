@@ -26,19 +26,10 @@ foundation_model_id = "us.anthropic.claude-sonnet-4-6"
 
 # ---- Phase 3.a — public web demo ----
 #
-# The auth module needs OAuth credentials for each federated IdP. Create the
-# OAuth apps on Google / GitHub / Slack first, set callback URL on each side
-# to https://${web_domain_name}/auth/callback (and http://localhost:5173/...
-# for local dev), then either fill these in here or pass via TF_VAR_<name>.
-#
-# terraform.tfvars is gitignored — these are sensitive.
-
-# google_client_id     = "REPLACE.apps.googleusercontent.com"
-# google_client_secret = "REPLACE"
-# github_client_id     = "REPLACE"
-# github_client_secret = "REPLACE"
-# slack_client_id      = "REPLACE"
-# slack_client_secret  = "REPLACE"
+# The auth module currently surfaces only the Cognito-managed (email/password)
+# sign-in option in the Hosted UI. Federated IdPs (Google, GitHub, Slack) are
+# deferred to Phase 3.5 — see terraform/modules/auth/main.tf for the full
+# rationale. No OAuth credentials are required to deploy.
 
 # Optional overrides:
 # web_domain_name                  = "demo.ms3dm.tech"

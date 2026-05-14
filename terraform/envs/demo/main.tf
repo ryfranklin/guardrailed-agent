@@ -315,13 +315,6 @@ module "auth" {
     "https://${var.web_domain_name}/",
     "http://localhost:5173/",
   ]
-
-  google_client_id     = var.google_client_id
-  google_client_secret = var.google_client_secret
-  github_client_id     = var.github_client_id
-  github_client_secret = var.github_client_secret
-  slack_client_id      = var.slack_client_id
-  slack_client_secret  = var.slack_client_secret
 }
 
 module "gateway" {

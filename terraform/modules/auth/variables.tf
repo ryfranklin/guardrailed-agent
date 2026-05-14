@@ -56,40 +56,18 @@ variable "refresh_token_validity_days" {
   default     = 30
 }
 
-variable "google_client_id" {
-  description = "Google OAuth client ID for the federated IdP. Pass via TF_VAR_google_client_id; never commit."
-  type        = string
-  sensitive   = true
-}
-
-variable "google_client_secret" {
-  description = "Google OAuth client secret. Pass via TF_VAR_google_client_secret; never commit."
-  type        = string
-  sensitive   = true
-}
-
 variable "github_client_id" {
-  description = "GitHub OAuth app client ID. Wrapped via Cognito's generic OIDC provider (GitHub does not expose JWKS). Pass via TF_VAR_github_client_id."
+  description = "GitHub OAuth app client ID. Reserved for the Phase 3.5 reintroduction of GitHub-as-OIDC; not consumed by any resource today. Pass via TF_VAR_github_client_id."
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "github_client_secret" {
-  description = "GitHub OAuth app client secret. Pass via TF_VAR_github_client_secret; never commit."
+  description = "GitHub OAuth app client secret. Reserved for Phase 3.5; not consumed by any resource today. Pass via TF_VAR_github_client_secret; never commit."
   type        = string
   sensitive   = true
-}
-
-variable "slack_client_id" {
-  description = "Slack 'Sign in with Slack' OIDC client ID. Pass via TF_VAR_slack_client_id; never commit."
-  type        = string
-  sensitive   = true
-}
-
-variable "slack_client_secret" {
-  description = "Slack 'Sign in with Slack' OIDC client secret. Pass via TF_VAR_slack_client_secret; never commit."
-  type        = string
-  sensitive   = true
+  default     = ""
 }
 
 variable "tags" {
